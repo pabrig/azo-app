@@ -71,7 +71,7 @@ export function CargaView({
       <ClassChips names={classNames} value={classFilter} onChange={onClassFilter} />
       <p className="text-[11px] text-slate-400">Puesto o código: DNC, DNS, OCS, DNF, DSQ.</p>
       {hasEvent ? (
-      <div className="overflow-x-auto rounded-xl border border-white/10">
+      <div className="competitor-scroll rounded-xl border border-white/10">
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="bg-sea-900 text-slate-400">

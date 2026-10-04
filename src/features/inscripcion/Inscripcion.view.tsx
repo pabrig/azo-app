@@ -38,8 +38,9 @@ export function InscripcionView({
   const previousCount = useRef(sailors.length);
 
   useEffect(() => {
-    if (sailors.length > previousCount.current) {
-      listRef.current?.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (sailors.length > previousCount.current && listRef.current) {
+      const list = listRef.current;
+      list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
     }
     previousCount.current = sailors.length;
   }, [sailors.length]);
@@ -161,7 +162,7 @@ export function InscripcionView({
           <h3 className="font-bold text-sm">{brief ? `Inscriptos · ${brief.name}` : "Inscriptos"}</h3>
           <span className="text-xs font-bold bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full">{sailors.length}</span>
         </div>
-        <div ref={listRef} className="divide-y divide-white/5">
+        <div ref={listRef} className="competitor-scroll divide-y divide-white/5">
           {!brief ? (
             <p className="py-6 text-center text-xs text-slate-500">Creá una fecha para empezar.</p>
           ) : sailors.length ? (

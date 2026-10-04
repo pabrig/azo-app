@@ -48,7 +48,7 @@ export function ResultsCard({
         </div>
         <span className="text-[10px] font-mono bg-sea-900 border border-white/10 px-2 py-1 rounded-md">{year}</span>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-white/10">
+      <div className="competitor-scroll rounded-xl border border-white/10">
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="bg-sea-900 text-white">
