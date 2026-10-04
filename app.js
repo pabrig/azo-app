@@ -6,14 +6,43 @@
   const MAX_DOC_BYTES = 2.5 * 1024 * 1024;
   const PENALTY_CODES = ["DNC", "DNS", "OCS", "DNF", "DSQ"];
   const DEFAULT_BOAT_CLASSES = [
-    { name: "ILCA 7", categories: ["General", "Apprentice", "Master", "Grand Master", "Great Grand Master"] },
-    { name: "ILCA 6", categories: ["General", "Junior", "Apprentice", "Master", "Grand Master", "Great Grand Master", "Femenino"] },
+    {
+      name: "ILCA 7",
+      categories: [
+        "General",
+        "Apprentice",
+        "Master",
+        "Grand Master",
+        "Great Grand Master"
+      ]
+    },
+    {
+      name: "ILCA 6",
+      categories: [
+        "General",
+        "Junior",
+        "Apprentice",
+        "Master",
+        "Grand Master",
+        "Great Grand Master",
+        "Femenino"
+      ]
+    },
     { name: "ILCA 4", categories: ["General", "Junior", "Cadete", "Femenino"] },
-    { name: "Pampero", categories: ["General", "Mixto", "Femenino", "Promocional"] },
+    {
+      name: "Pampero",
+      categories: ["General", "Mixto", "Femenino", "Promocional"]
+    },
     { name: "Otras", categories: ["General", "Libre"] }
   ];
-  const DEFAULT_AR = { name: "AR_VELA_LIGERA.docx", href: "docs/AR_VELA_LIGERA.docx" };
-  const DEFAULT_IR = { name: "IR_VELA_LIGERA.docx", href: "docs/IR_VELA_LIGERA.docx" };
+  const DEFAULT_AR = {
+    name: "AR_VELA_LIGERA.docx",
+    href: "docs/AR_VELA_LIGERA.docx"
+  };
+  const DEFAULT_IR = {
+    name: "IR_VELA_LIGERA.docx",
+    href: "docs/IR_VELA_LIGERA.docx"
+  };
   const DEFAULT_WHATSAPP = "https://chat.whatsapp.com/EZWmFlBaIYZCyw7pdwecob";
   const DEFAULT_AVISOS = `Avisos de esta fecha (además del grupo oficial de WhatsApp).
 Se prevén 3 regatas (válida con 2).
@@ -66,12 +95,14 @@ Canal de seguridad: 68 (bandera V).`;
   function migrateEvents(raw) {
     if (Array.isArray(raw)) return raw.map((e) => makeFecha(e));
     if (raw && typeof raw === "object") {
-      return Object.entries(raw).map(([id, e], i) => makeFecha({
-        ...e,
-        id,
-        name: e.name || `Fecha ${i + 1}`,
-        date: e.date || (id === "f1" ? "2026-10-03" : "")
-      }));
+      return Object.entries(raw).map(([id, e], i) =>
+        makeFecha({
+          ...e,
+          id,
+          name: e.name || `Fecha ${i + 1}`,
+          date: e.date || (id === "f1" ? "2026-10-03" : "")
+        })
+      );
     }
     return seedEvents();
   }
@@ -89,25 +120,36 @@ Canal de seguridad: 68 (bandera V).`;
   }
 
   function defaultBoatClasses() {
-    return DEFAULT_BOAT_CLASSES.map((c) => ({ name: c.name, categories: c.categories.slice() }));
+    return DEFAULT_BOAT_CLASSES.map((c) => ({
+      name: c.name,
+      categories: c.categories.slice()
+    }));
   }
 
   function migrateClasses(raw) {
     if (!Array.isArray(raw) || !raw.length) return defaultBoatClasses();
-    return raw.map((c) => {
-      if (typeof c === "string") {
-        const known = DEFAULT_BOAT_CLASSES.find((d) => d.name === c);
-        return { name: c, categories: known ? known.categories.slice() : ["General"] };
-      }
-      const cats = Array.isArray(c.categories) && c.categories.length
-        ? c.categories.map((x) => String(x).trim()).filter(Boolean)
-        : ["General"];
-      return { name: String(c.name || "").trim(), categories: cats };
-    }).filter((c) => c.name);
+    return raw
+      .map((c) => {
+        if (typeof c === "string") {
+          const known = DEFAULT_BOAT_CLASSES.find((d) => d.name === c);
+          return {
+            name: c,
+            categories: known ? known.categories.slice() : ["General"]
+          };
+        }
+        const cats =
+          Array.isArray(c.categories) && c.categories.length
+            ? c.categories.map((x) => String(x).trim()).filter(Boolean)
+            : ["General"];
+        return { name: String(c.name || "").trim(), categories: cats };
+      })
+      .filter((c) => c.name);
   }
 
   function boatClasses() {
-    return (state.classes && state.classes.length) ? state.classes : defaultBoatClasses();
+    return state.classes && state.classes.length
+      ? state.classes
+      : defaultBoatClasses();
   }
 
   function classNames() {
@@ -116,11 +158,14 @@ Canal de seguridad: 68 (bandera V).`;
 
   function loadState() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_KEY);
+      const raw =
+        localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_KEY);
       if (!raw) return defaultState();
       const parsed = JSON.parse(raw);
       const events = migrateEvents(parsed.events);
-      const fecha = events.some((e) => e.id === parsed.fecha) ? parsed.fecha : events[0]?.id;
+      const fecha = events.some((e) => e.id === parsed.fecha)
+        ? parsed.fecha
+        : events[0]?.id;
       return {
         ...defaultState(),
         ...parsed,
@@ -139,19 +184,24 @@ Canal de seguridad: 68 (bandera V).`;
   }
 
   function currentEvent() {
-    return eventList().find((e) => e.id === state.fecha) || eventList()[0] || null;
+    return (
+      eventList().find((e) => e.id === state.fecha) || eventList()[0] || null
+    );
   }
 
   function persistLocal() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        fecha: state.fecha,
-        classFilter: state.classFilter,
-        sailors: state.sailors,
-        events: state.events,
-        whatsappUrl: officialWhatsApp(),
-        classes: boatClasses()
-      }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          fecha: state.fecha,
+          classFilter: state.classFilter,
+          sailors: state.sailors,
+          events: state.events,
+          whatsappUrl: officialWhatsApp(),
+          classes: boatClasses()
+        })
+      );
     } catch {
       toast("Sin espacio para guardar un documento tan grande");
     }
@@ -170,12 +220,21 @@ Canal de seguridad: 68 (bandera V).`;
   }
 
   function unwrapEvents(raw) {
-    const empty = { events: seedEvents(), whatsappUrl: DEFAULT_WHATSAPP, classes: null };
+    const empty = {
+      events: seedEvents(),
+      whatsappUrl: DEFAULT_WHATSAPP,
+      classes: null
+    };
     if (!raw) return empty;
     if (typeof raw === "string") {
-      try { raw = JSON.parse(raw); } catch { return empty; }
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        return empty;
+      }
     }
-    if (Array.isArray(raw)) return { events: migrateEvents(raw), whatsappUrl: null, classes: null };
+    if (Array.isArray(raw))
+      return { events: migrateEvents(raw), whatsappUrl: null, classes: null };
     if (raw.fechas) {
       return {
         events: migrateEvents(raw.fechas),
@@ -183,7 +242,11 @@ Canal de seguridad: 68 (bandera V).`;
         classes: raw.classes || null
       };
     }
-    return { events: migrateEvents(raw), whatsappUrl: raw.whatsappUrl || null, classes: raw.classes || null };
+    return {
+      events: migrateEvents(raw),
+      whatsappUrl: raw.whatsappUrl || null,
+      classes: raw.classes || null
+    };
   }
 
   function cloudPayload() {
@@ -194,22 +257,36 @@ Canal de seguridad: 68 (bandera V).`;
   }
 
   function parseCloudDoc(doc) {
-    if (!doc) return { sailors: [], events: seedEvents(), whatsappUrl: DEFAULT_WHATSAPP, classes: defaultBoatClasses() };
-    const sailors = typeof doc.sailors === "string" ? JSON.parse(doc.sailors || "[]") : (doc.sailors || []);
+    if (!doc)
+      return {
+        sailors: [],
+        events: seedEvents(),
+        whatsappUrl: DEFAULT_WHATSAPP,
+        classes: defaultBoatClasses()
+      };
+    const sailors =
+      typeof doc.sailors === "string"
+        ? JSON.parse(doc.sailors || "[]")
+        : doc.sailors || [];
     const unwrapped = unwrapEvents(doc.events);
-    return { sailors, events: unwrapped.events, whatsappUrl: unwrapped.whatsappUrl, classes: unwrapped.classes };
+    return {
+      sailors,
+      events: unwrapped.events,
+      whatsappUrl: unwrapped.whatsappUrl,
+      classes: unwrapped.classes
+    };
   }
 
   function setSyncBadge(mode, label) {
     const el = document.getElementById("syncBadge");
     el.textContent = label;
-    el.className = "text-[10px] px-2 py-1 rounded-full border font-semibold " + (
-      mode === "live"
+    el.className =
+      "text-[10px] px-2 py-1 rounded-full border font-semibold " +
+      (mode === "live"
         ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
         : mode === "error"
           ? "border-wheel/40 bg-red-500/15 text-red-200"
-          : "border-amber-400/40 bg-amber-500/15 text-amber-200"
-    );
+          : "border-amber-400/40 bg-amber-500/15 text-amber-200");
   }
 
   function toast(msg) {
@@ -229,7 +306,9 @@ Canal de seguridad: 68 (bandera V).`;
     if (!sel) return;
     const prev = sel.value;
     const names = classNames();
-    sel.innerHTML = names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+    sel.innerHTML = names
+      .map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`)
+      .join("");
     if (names.includes(prev)) sel.value = prev;
     else if (names.includes("ILCA 6")) sel.value = "ILCA 6";
     fillCategories();
@@ -242,13 +321,17 @@ Canal de seguridad: 68 (bandera V).`;
     const found = boatClasses().find((c) => c.name === sel.value);
     const cats = found?.categories?.length ? found.categories : ["General"];
     const prev = catSel.value;
-    catSel.innerHTML = cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+    catSel.innerHTML = cats
+      .map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
+      .join("");
     if (cats.includes(prev)) catSel.value = prev;
   }
 
   function switchTab(tab) {
     currentTab = tab;
-    document.querySelectorAll(".app-view").forEach((v) => v.classList.add("hidden"));
+    document
+      .querySelectorAll(".app-view")
+      .forEach((v) => v.classList.add("hidden"));
     document.getElementById(`view-${tab}`).classList.remove("hidden");
     document.querySelectorAll(".nav-btn").forEach((b) => {
       const on = b.dataset.tab === tab;
@@ -256,7 +339,9 @@ Canal de seguridad: 68 (bandera V).`;
       b.classList.toggle("font-bold", on);
       b.classList.toggle("text-slate-400", !on);
     });
-    document.getElementById("fechaBarWrap").classList.toggle("hidden", tab === "ranking");
+    document
+      .getElementById("fechaBarWrap")
+      .classList.toggle("hidden", tab === "ranking");
     render();
   }
 
@@ -268,7 +353,8 @@ Canal de seguridad: 68 (bandera V).`;
   }
 
   function sailorFechas(sailor) {
-    if (Array.isArray(sailor.fechas) && sailor.fechas.length) return sailor.fechas;
+    if (Array.isArray(sailor.fechas) && sailor.fechas.length)
+      return sailor.fechas;
     return eventList()[0] ? [eventList()[0].id] : [];
   }
 
@@ -298,7 +384,12 @@ Canal de seguridad: 68 (bandera V).`;
   function scheduleCloudSave() {
     if (applyingRemote) return;
     if (!appwriteReady) {
-      if (!appwriteConnecting && typeof navigator !== "undefined" && navigator.onLine && window.CNA_APPWRITE_PROJECT_ID) {
+      if (
+        !appwriteConnecting &&
+        typeof navigator !== "undefined" &&
+        navigator.onLine &&
+        window.CNA_APPWRITE_PROJECT_ID
+      ) {
         initAppwrite();
       }
       return;
@@ -308,7 +399,11 @@ Canal de seguridad: 68 (bandera V).`;
   }
 
   function tableId() {
-    return window.CNA_APPWRITE_TABLE_ID || window.CNA_APPWRITE_COLLECTION_ID || "championship";
+    return (
+      window.CNA_APPWRITE_TABLE_ID ||
+      window.CNA_APPWRITE_COLLECTION_ID ||
+      "championship"
+    );
   }
 
   function dbId() {
@@ -343,13 +438,20 @@ Canal de seguridad: 68 (bandera V).`;
       await awRequest("PATCH", path, { data });
       setSyncBadge("live", "Appwrite");
     } catch (err) {
-      if (err && (err.code === 404 || String(err.type || "").includes("not_found"))) {
+      if (
+        err &&
+        (err.code === 404 || String(err.type || "").includes("not_found"))
+      ) {
         try {
-          await awRequest("POST", `/tablesdb/${dbId()}/tables/${tableId()}/rows`, {
-            rowId: CHAMP_ID,
-            data,
-            permissions: ["read(\"any\")", "update(\"any\")", "delete(\"any\")"]
-          });
+          await awRequest(
+            "POST",
+            `/tablesdb/${dbId()}/tables/${tableId()}/rows`,
+            {
+              rowId: CHAMP_ID,
+              data,
+              permissions: ['read("any")', 'update("any")', 'delete("any")']
+            }
+          );
           setSyncBadge("live", "Appwrite");
           return;
         } catch (createErr) {
@@ -368,8 +470,10 @@ Canal de seguridad: 68 (bandera V).`;
       if (Array.isArray(parsed.sailors)) state.sailors = parsed.sailors;
       if (parsed.events) state.events = migrateEvents(parsed.events);
       if (parsed.whatsappUrl) state.whatsappUrl = parsed.whatsappUrl;
-      if (parsed.classes && parsed.classes.length) state.classes = migrateClasses(parsed.classes);
-      if (!eventList().some((e) => e.id === state.fecha) && eventList()[0]) state.fecha = eventList()[0].id;
+      if (parsed.classes && parsed.classes.length)
+        state.classes = migrateClasses(parsed.classes);
+      if (!eventList().some((e) => e.id === state.fecha) && eventList()[0])
+        state.fecha = eventList()[0].id;
       persistLocal();
       render();
     } catch (err) {
@@ -381,7 +485,9 @@ Canal de seguridad: 68 (bandera V).`;
   async function initAppwrite() {
     if (appwriteConnecting) return;
     appwriteProject = window.CNA_APPWRITE_PROJECT_ID;
-    appwriteEndpoint = (window.CNA_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1").replace(/\/$/, "");
+    appwriteEndpoint = (
+      window.CNA_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1"
+    ).replace(/\/$/, "");
     if (!appwriteProject || !dbId()) {
       setSyncBadge("local", "Solo celular");
       return;
@@ -389,16 +495,28 @@ Canal de seguridad: 68 (bandera V).`;
     appwriteConnecting = true;
 
     try {
-      const row = await awRequest("GET", `/tablesdb/${dbId()}/tables/${tableId()}/rows/${CHAMP_ID}`);
+      const row = await awRequest(
+        "GET",
+        `/tablesdb/${dbId()}/tables/${tableId()}/rows/${CHAMP_ID}`
+      );
       const parsed = parseCloudDoc(row);
-      const remoteEmpty = !parsed.sailors?.length && migrateEvents(parsed.events).every((e) => !Object.keys(e.scores || {}).length);
-      const localHas = state.sailors.length > 0 || eventList().some((e) => Object.keys(e.scores || {}).length);
+      const remoteEmpty =
+        !parsed.sailors?.length &&
+        migrateEvents(parsed.events).every(
+          (e) => !Object.keys(e.scores || {}).length
+        );
+      const localHas =
+        state.sailors.length > 0 ||
+        eventList().some((e) => Object.keys(e.scores || {}).length);
       appwriteReady = true;
       if (remoteEmpty || localHas) await pushCloud();
       else applyRemote(row);
       setSyncBadge("live", "Appwrite");
     } catch (err) {
-      if (err && (err.code === 404 || String(err.type || "").includes("not_found"))) {
+      if (
+        err &&
+        (err.code === 404 || String(err.type || "").includes("not_found"))
+      ) {
         appwriteReady = true;
         await pushCloud();
       } else {
@@ -411,7 +529,9 @@ Canal de seguridad: 68 (bandera V).`;
 
     if (appwriteReady && window.Appwrite?.Client) {
       try {
-        const client = new window.Appwrite.Client().setEndpoint(appwriteEndpoint).setProject(appwriteProject);
+        const client = new window.Appwrite.Client()
+          .setEndpoint(appwriteEndpoint)
+          .setProject(appwriteProject);
         const channel = `databases.${dbId()}.tables.${tableId()}.rows.${CHAMP_ID}`;
         client.subscribe(channel, (message) => {
           if (message.payload) applyRemote(message.payload);
@@ -428,14 +548,20 @@ Canal de seguridad: 68 (bandera V).`;
       toast("No hay fechas creadas");
       return;
     }
-    const sailNumber = document.getElementById("regSail").value.trim().toUpperCase();
+    const sailNumber = document
+      .getElementById("regSail")
+      .value.trim()
+      .toUpperCase();
     const boatClass = document.getElementById("regClass").value;
     const name = document.getElementById("regName").value.trim();
     const category = document.getElementById("regCategory").value;
-    const club = document.getElementById("regClub").value.trim().toUpperCase() || "CNA";
+    const club =
+      document.getElementById("regClub").value.trim().toUpperCase() || "CNA";
     const fecha = document.getElementById("regFecha").value;
 
-    const existing = state.sailors.find((s) => s.sailNumber === sailNumber && s.boatClass === boatClass);
+    const existing = state.sailors.find(
+      (s) => s.sailNumber === sailNumber && s.boatClass === boatClass
+    );
     if (existing) {
       existing.name = name;
       existing.category = category;
@@ -472,7 +598,9 @@ Canal de seguridad: 68 (bandera V).`;
     }
     if (!confirm("¿Eliminar este inscripto?")) return;
     state.sailors = state.sailors.filter((s) => s.id !== id);
-    eventList().forEach((ev) => { delete ev.scores[id]; });
+    eventList().forEach((ev) => {
+      delete ev.scores[id];
+    });
     saveAll();
     render();
     toast("Eliminado");
@@ -481,7 +609,7 @@ Canal de seguridad: 68 (bandera V).`;
   function unlockAdmin(e) {
     e.preventDefault();
     const pin = document.getElementById("pinInput").value.trim();
-    if (pin !== (window.CNA_ADMIN_PIN || "azo")) {
+    if (pin !== (window.CNA_ADMIN_PIN || "296")) {
       toast("PIN incorrecto");
       return;
     }
@@ -503,7 +631,8 @@ Canal de seguridad: 68 (bandera V).`;
     if (!ev || ev.racesCount <= 1) return;
     ev.racesCount -= 1;
     Object.keys(ev.scores).forEach((sid) => {
-      if (Array.isArray(ev.scores[sid])) ev.scores[sid] = ev.scores[sid].slice(0, ev.racesCount);
+      if (Array.isArray(ev.scores[sid]))
+        ev.scores[sid] = ev.scores[sid].slice(0, ev.racesCount);
     });
     saveAll();
     render();
@@ -518,23 +647,34 @@ Canal de seguridad: 68 (bandera V).`;
   }
 
   function scoreOptions(selected) {
-    const vals = [""].concat(Array.from({ length: 30 }, (_, i) => String(i + 1)), PENALTY_CODES);
-    return vals.map((v) => {
-      const label = v === "" ? "—" : v;
-      const sel = String(selected ?? "") === v ? "selected" : "";
-      return `<option value="${v}" ${sel}>${label}</option>`;
-    }).join("");
+    const vals = [""].concat(
+      Array.from({ length: 30 }, (_, i) => String(i + 1)),
+      PENALTY_CODES
+    );
+    return vals
+      .map((v) => {
+        const label = v === "" ? "—" : v;
+        const sel = String(selected ?? "") === v ? "selected" : "";
+        return `<option value="${v}" ${sel}>${label}</option>`;
+      })
+      .join("");
   }
 
   function classChips(containerId) {
     const el = document.getElementById(containerId);
     if (!el) return;
-    if (state.classFilter !== "ALL" && !classNames().includes(state.classFilter)) state.classFilter = "ALL";
+    if (
+      state.classFilter !== "ALL" &&
+      !classNames().includes(state.classFilter)
+    )
+      state.classFilter = "ALL";
     const chips = ["ALL", ...classNames()];
-    el.innerHTML = chips.map((c) => {
-      const on = state.classFilter === c;
-      return `<button type="button" onclick='setClassFilter(${JSON.stringify(c)})' class="whitespace-nowrap px-2.5 py-1 rounded-lg text-[10px] font-bold ${on ? "bg-cyan-500 text-sea-900" : "bg-white/10 text-slate-300"}">${c === "ALL" ? "Todas" : escapeHtml(c)}</button>`;
-    }).join("");
+    el.innerHTML = chips
+      .map((c) => {
+        const on = state.classFilter === c;
+        return `<button type="button" onclick='setClassFilter(${JSON.stringify(c)})' class="whitespace-nowrap px-2.5 py-1 rounded-lg text-[10px] font-bold ${on ? "bg-cyan-500 text-sea-900" : "bg-white/10 text-slate-300"}">${c === "ALL" ? "Todas" : escapeHtml(c)}</button>`;
+      })
+      .join("");
   }
 
   function sailorsInFecha(fechaKey) {
@@ -583,7 +723,9 @@ Canal de seguridad: 68 (bandera V).`;
   function rankedForFecha(fechaKey) {
     return filteredSailors(fechaKey)
       .map((s) => ({ ...s, ...dateNet(s, fechaKey) }))
-      .sort((a, b) => a.net - b.net || a.sailNumber.localeCompare(b.sailNumber));
+      .sort(
+        (a, b) => a.net - b.net || a.sailNumber.localeCompare(b.sailNumber)
+      );
   }
 
   function rankedOverall() {
@@ -594,7 +736,9 @@ Canal de seguridad: 68 (bandera V).`;
         const net = breakdown.reduce((a, b) => a + b, 0);
         return { ...s, breakdown, net };
       })
-      .sort((a, b) => a.net - b.net || a.sailNumber.localeCompare(b.sailNumber));
+      .sort(
+        (a, b) => a.net - b.net || a.sailNumber.localeCompare(b.sailNumber)
+      );
   }
 
   function docHref(doc) {
@@ -651,16 +795,32 @@ Canal de seguridad: 68 (bandera V).`;
     try {
       const arFile = document.getElementById("evAr").files[0];
       const irFile = document.getElementById("evIr").files[0];
-      if (arFile) next.ar = { name: arFile.name, dataUrl: await readFileAsDataUrl(arFile) };
-      if (irFile) next.ir = { name: irFile.name, dataUrl: await readFileAsDataUrl(irFile) };
+      if (arFile)
+        next.ar = {
+          name: arFile.name,
+          dataUrl: await readFileAsDataUrl(arFile)
+        };
+      if (irFile)
+        next.ir = {
+          name: irFile.name,
+          dataUrl: await readFileAsDataUrl(irFile)
+        };
     } catch (err) {
       toast(err.message);
       return;
     }
     const idx = eventList().findIndex((ev) => ev.id === next.id);
-    if (idx >= 0) state.events[idx] = { ...existing, ...next, scores: existing.scores, racesCount: existing.racesCount };
+    if (idx >= 0)
+      state.events[idx] = {
+        ...existing,
+        ...next,
+        scores: existing.scores,
+        racesCount: existing.racesCount
+      };
     else state.events.push(next);
-    state.events.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
+    state.events.sort((a, b) =>
+      `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`)
+    );
     state.fecha = next.id;
     resetFechaForm();
     saveAll();
@@ -755,7 +915,8 @@ Canal de seguridad: 68 (bandera V).`;
     if (canalAdmin) {
       canalAdmin.classList.toggle("hidden", !isAdmin());
       const wa = document.getElementById("waUrl");
-      if (wa && isAdmin() && document.activeElement !== wa) wa.value = officialWhatsApp();
+      if (wa && isAdmin() && document.activeElement !== wa)
+        wa.value = officialWhatsApp();
     }
   }
 
@@ -766,16 +927,23 @@ Canal de seguridad: 68 (bandera V).`;
       bar.innerHTML = `<p class="text-xs text-slate-500 px-2 py-1">Sin fechas. Creálas en la pestaña Fechas.</p>`;
       return;
     }
-    bar.innerHTML = list.map((ev) => {
-      const on = ev.id === state.fecha;
-      return `<button type="button" class="fecha-chip shrink-0 py-2 px-3 rounded-xl text-xs font-bold ${on ? "bg-cyan-500 text-sea-900" : "text-slate-400"}" onclick="setFecha('${ev.id}')">${escapeHtml(ev.name)}</button>`;
-    }).join("");
+    bar.innerHTML = list
+      .map((ev) => {
+        const on = ev.id === state.fecha;
+        return `<button type="button" class="fecha-chip shrink-0 py-2 px-3 rounded-xl text-xs font-bold ${on ? "bg-cyan-500 text-sea-900" : "text-slate-400"}" onclick="setFecha('${ev.id}')">${escapeHtml(ev.name)}</button>`;
+      })
+      .join("");
   }
 
   function renderFechaSelect() {
     const sel = document.getElementById("regFecha");
     const list = eventList();
-    sel.innerHTML = list.map((ev) => `<option value="${ev.id}">${escapeHtml(fechaLabel(ev.id))}</option>`).join("");
+    sel.innerHTML = list
+      .map(
+        (ev) =>
+          `<option value="${ev.id}">${escapeHtml(fechaLabel(ev.id))}</option>`
+      )
+      .join("");
     if (state.fecha) sel.value = state.fecha;
     document.getElementById("btnInscribir").disabled = !list.length;
   }
@@ -808,13 +976,20 @@ Canal de seguridad: 68 (bandera V).`;
     if (adminBox) adminBox.classList.toggle("hidden", !admin);
     const publicList = document.getElementById("clasesPublicList");
     if (publicList) {
-      publicList.innerHTML = boatClasses().map((c) =>
-        `<span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/10 text-slate-200">${escapeHtml(c.name)}</span>`
-      ).join("") || `<span class="text-xs text-slate-400">Sin clases definidas.</span>`;
+      publicList.innerHTML =
+        boatClasses()
+          .map(
+            (c) =>
+              `<span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/10 text-slate-200">${escapeHtml(c.name)}</span>`
+          )
+          .join("") ||
+        `<span class="text-xs text-slate-400">Sin clases definidas.</span>`;
     }
     const adminList = document.getElementById("clasesAdminList");
     if (!adminList) return;
-    adminList.innerHTML = boatClasses().map((c) => `
+    adminList.innerHTML = boatClasses()
+      .map(
+        (c) => `
       <div class="py-2.5 flex items-start justify-between gap-2">
         <div>
           <p class="font-semibold text-sm">${escapeHtml(c.name)}</p>
@@ -824,7 +999,9 @@ Canal de seguridad: 68 (bandera V).`;
           <button type="button" class="text-xs bg-white/10 px-2 py-1 rounded-lg" onclick='editBoatClass(${JSON.stringify(c.name)})'>Editar</button>
           <button type="button" class="text-xs text-red-300 px-2 py-1" onclick='deleteBoatClass(${JSON.stringify(c.name)})'>Borrar</button>
         </div>
-      </div>`).join("");
+      </div>`
+      )
+      .join("");
   }
 
   function saveBoatClass(e) {
@@ -835,11 +1012,17 @@ Canal de seguridad: 68 (bandera V).`;
     }
     const name = document.getElementById("clsName").value.trim();
     const original = document.getElementById("editClassOriginal").value.trim();
-    const categories = document.getElementById("clsCats").value.split(",").map((s) => s.trim()).filter(Boolean);
+    const categories = document
+      .getElementById("clsCats")
+      .value.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (!name) return;
     const cats = categories.length ? categories : ["General"];
     const list = boatClasses().slice();
-    const dup = list.find((c) => c.name.toLowerCase() === name.toLowerCase() && c.name !== original);
+    const dup = list.find(
+      (c) => c.name.toLowerCase() === name.toLowerCase() && c.name !== original
+    );
     if (dup) {
       toast("Ya existe una clase con ese nombre");
       return;
@@ -873,7 +1056,9 @@ Canal de seguridad: 68 (bandera V).`;
     document.getElementById("editClassOriginal").value = c.name;
     document.getElementById("clsName").value = c.name;
     document.getElementById("clsCats").value = c.categories.join(", ");
-    document.getElementById("clasesAdmin")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document
+      .getElementById("clasesAdmin")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function deleteBoatClass(name) {
@@ -912,17 +1097,23 @@ Canal de seguridad: 68 (bandera V).`;
       host.innerHTML = `<div class="bg-sea-800 rounded-2xl p-4 border border-white/10 text-sm text-slate-400">No hay fechas. La comisión puede crearlas con el PIN.</div>`;
       return;
     }
-    host.innerHTML = list.map((ev) => `
+    host.innerHTML = list
+      .map(
+        (ev) => `
       <article class="bg-sea-800 rounded-2xl p-4 border border-white/10 space-y-2">
         <div class="flex items-start justify-between gap-2">
           <div>
             <h3 class="font-bold">${escapeHtml(ev.name)}</h3>
             <p class="text-sm text-cyan-400">${ev.date ? formatDay(ev.date) : "Sin día"} · ${escapeHtml(ev.time || "—")} hs</p>
           </div>
-          ${admin ? `<div class="flex gap-1">
+          ${
+            admin
+              ? `<div class="flex gap-1">
             <button type="button" class="text-xs bg-white/10 px-2 py-1 rounded-lg" onclick="editFecha('${ev.id}')">Editar</button>
             <button type="button" class="text-xs text-red-300 px-2 py-1" onclick="deleteFecha('${ev.id}')">Borrar</button>
-          </div>` : ""}
+          </div>`
+              : ""
+          }
         </div>
         <p class="text-xs text-slate-400 whitespace-pre-line">${escapeHtml(ev.avisos || "Sin avisos.")}</p>
         <p class="text-[11px] text-slate-500">AR: ${escapeHtml(ev.ar?.name || "—")} · IR: ${escapeHtml(ev.ir?.name || "—")}</p>
@@ -930,7 +1121,9 @@ Canal de seguridad: 68 (bandera V).`;
           <button type="button" class="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold" onclick="downloadDoc('${ev.id}','ar')">AR</button>
           <button type="button" class="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold" onclick="downloadDoc('${ev.id}','ir')">IR</button>
         </div>
-      </article>`).join("");
+      </article>`
+      )
+      .join("");
   }
 
   function renderInscriptos() {
@@ -938,7 +1131,9 @@ Canal de seguridad: 68 (bandera V).`;
     const title = ev ? `Inscriptos · ${ev.name}` : "Inscriptos";
     document.getElementById("listaInscriptosTitle").textContent = title;
     const list = ev ? sailorsInFecha(ev.id) : [];
-    document.getElementById("countInscriptos").textContent = String(list.length);
+    document.getElementById("countInscriptos").textContent = String(
+      list.length
+    );
     const box = document.getElementById("listaInscriptos");
     if (!ev) {
       box.innerHTML = `<p class="py-6 text-center text-xs text-slate-500">Creá una fecha para empezar.</p>`;
@@ -948,7 +1143,9 @@ Canal de seguridad: 68 (bandera V).`;
       box.innerHTML = `<p class="py-6 text-center text-xs text-slate-500">Nadie inscripto aún en ${escapeHtml(ev.name)}.</p>`;
       return;
     }
-    box.innerHTML = list.map((s) => `
+    box.innerHTML = list
+      .map(
+        (s) => `
       <div class="py-2.5 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2 min-w-0">
           <span class="font-mono font-bold text-cyan-400 bg-sea-900 border border-white/10 px-2 py-1 rounded-lg text-[11px]">${escapeHtml(s.sailNumber)}</span>
@@ -959,7 +1156,9 @@ Canal de seguridad: 68 (bandera V).`;
           </div>
         </div>
         <button type="button" class="text-slate-500 text-xs px-2" onclick="deleteSailor('${s.id}')">✕</button>
-      </div>`).join("");
+      </div>`
+      )
+      .join("");
   }
 
   function renderCarga() {
@@ -969,49 +1168,69 @@ Canal de seguridad: 68 (bandera V).`;
     if (locked) return;
     const ev = currentEvent();
     if (!ev) {
-      document.getElementById("cargaSubtitle").innerText = "Creá una fecha en la pestaña Fechas.";
+      document.getElementById("cargaSubtitle").innerText =
+        "Creá una fecha en la pestaña Fechas.";
       document.getElementById("cargaBody").innerHTML = "";
       document.getElementById("cargaHead").innerHTML = "";
       return;
     }
-    document.getElementById("cargaSubtitle").innerText = `${ev.name} · ${formatDay(ev.date)} ${ev.time} · ${ev.racesCount} regata${ev.racesCount > 1 ? "s" : ""}`;
+    document.getElementById("cargaSubtitle").innerText =
+      `${ev.name} · ${formatDay(ev.date)} ${ev.time} · ${ev.racesCount} regata${ev.racesCount > 1 ? "s" : ""}`;
     classChips("classChipsCarga");
     const sailors = filteredSailors(ev.id);
     document.getElementById("cargaHead").innerHTML =
       `<th class="p-2 sticky-col-header bg-sea-900 min-w-[120px]">Vela</th>` +
-      Array.from({ length: ev.racesCount }, (_, i) => `<th class="p-2 text-center min-w-[72px]">R${i + 1}</th>`).join("");
+      Array.from(
+        { length: ev.racesCount },
+        (_, i) => `<th class="p-2 text-center min-w-[72px]">R${i + 1}</th>`
+      ).join("");
     if (!sailors.length) {
-      document.getElementById("cargaBody").innerHTML = `<tr><td class="p-4 text-center text-slate-500" colspan="${ev.racesCount + 1}">Sin inscriptos en este filtro.</td></tr>`;
+      document.getElementById("cargaBody").innerHTML =
+        `<tr><td class="p-4 text-center text-slate-500" colspan="${ev.racesCount + 1}">Sin inscriptos en este filtro.</td></tr>`;
       return;
     }
-    document.getElementById("cargaBody").innerHTML = sailors.map((s) => {
-      const scores = ev.scores[s.id] || [];
-      return `<tr class="border-t border-white/5">
+    document.getElementById("cargaBody").innerHTML = sailors
+      .map((s) => {
+        const scores = ev.scores[s.id] || [];
+        return `<tr class="border-t border-white/5">
         <td class="p-2 sticky-col bg-sea-800">
           <p class="font-mono font-bold text-cyan-400">${escapeHtml(s.sailNumber)}</p>
           <p class="text-[10px] text-slate-400 truncate max-w-[110px]">${escapeHtml(s.name)}</p>
         </td>
-        ${Array.from({ length: ev.racesCount }, (_, i) => `
+        ${Array.from(
+          { length: ev.racesCount },
+          (_, i) => `
           <td class="p-1 text-center">
             <select onchange="updateScore('${s.id}', ${i}, this.value)" class="w-[4.25rem] h-10 bg-sea-900 border border-white/10 rounded-lg text-center font-bold">
               ${scoreOptions(scores[i])}
             </select>
-          </td>`).join("")}
+          </td>`
+        ).join("")}
       </tr>`;
-    }).join("");
+      })
+      .join("");
   }
 
   function renderPlacaOrRanking() {
     const isRanking = currentTab === "ranking";
     const card = document.getElementById("exportableCard");
-    const host = isRanking ? document.getElementById("view-ranking") : document.getElementById("view-placa");
+    const host = isRanking
+      ? document.getElementById("view-ranking")
+      : document.getElementById("view-placa");
     if (card.parentElement !== host) host.appendChild(card);
 
     classChips("classChipsPlaca");
     classChips("classChipsRanking");
-    document.getElementById("cardClass").textContent = state.classFilter === "ALL" ? "Todas las clases" : state.classFilter;
-    document.getElementById("cardYear").textContent = String(new Date().getFullYear());
-    document.getElementById("cardStamp").textContent = new Date().toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+    document.getElementById("cardClass").textContent =
+      state.classFilter === "ALL" ? "Todas las clases" : state.classFilter;
+    document.getElementById("cardYear").textContent = String(
+      new Date().getFullYear()
+    );
+    document.getElementById("cardStamp").textContent =
+      new Date().toLocaleString("es-AR", {
+        dateStyle: "short",
+        timeStyle: "short"
+      });
 
     if (isRanking) {
       const ids = eventList();
@@ -1025,7 +1244,9 @@ Canal de seguridad: 68 (bandera V).`;
         <th class="p-2 text-center bg-sea-900 text-cyan-400">Netos</th>`;
       const rows = rankedOverall();
       document.getElementById("placaBody").innerHTML = rows.length
-        ? rows.map((s, i) => rowHtml(i, s, s.breakdown.map(String), s.net)).join("")
+        ? rows
+            .map((s, i) => rowHtml(i, s, s.breakdown.map(String), s.net))
+            .join("")
         : emptyRow(5 + ids.length);
       return;
     }
@@ -1036,7 +1257,8 @@ Canal de seguridad: 68 (bandera V).`;
       document.getElementById("placaBody").innerHTML = emptyRow(5);
       return;
     }
-    document.getElementById("cardTitle").textContent = `PLACA ${ev.name.toUpperCase()}`;
+    document.getElementById("cardTitle").textContent =
+      `PLACA ${ev.name.toUpperCase()}`;
     document.getElementById("cardClass").textContent =
       `${state.classFilter === "ALL" ? "Todas las clases" : state.classFilter} · ${formatDay(ev.date)} ${ev.time}`;
     document.getElementById("placaHead").innerHTML = `
@@ -1048,18 +1270,29 @@ Canal de seguridad: 68 (bandera V).`;
       <th class="p-2 text-center bg-sea-900 text-cyan-400">Netos</th>`;
     const rows = rankedForFecha(ev.id);
     document.getElementById("placaBody").innerHTML = rows.length
-      ? rows.map((s, i) => {
-          const display = Array.from({ length: ev.racesCount }, (_, idx) => {
-            const v = (s.raw || [])[idx];
-            return v === null || v === undefined || v === "" ? "DNC" : String(v);
-          });
-          return rowHtml(i, s, display, s.net);
-        }).join("")
+      ? rows
+          .map((s, i) => {
+            const display = Array.from({ length: ev.racesCount }, (_, idx) => {
+              const v = (s.raw || [])[idx];
+              return v === null || v === undefined || v === ""
+                ? "DNC"
+                : String(v);
+            });
+            return rowHtml(i, s, display, s.net);
+          })
+          .join("")
       : emptyRow(5 + ev.racesCount);
   }
 
   function rowHtml(i, s, cells, net) {
-    const posColor = i === 0 ? "text-amber-300" : i === 1 ? "text-slate-200" : i === 2 ? "text-amber-600" : "text-slate-400";
+    const posColor =
+      i === 0
+        ? "text-amber-300"
+        : i === 1
+          ? "text-slate-200"
+          : i === 2
+            ? "text-amber-600"
+            : "text-slate-400";
     return `<tr class="${i % 2 ? "bg-sea-900/40" : ""}">
       <td class="p-2 text-center font-bold ${posColor}">${i + 1}º</td>
       <td class="p-2 font-mono font-bold text-cyan-400">${escapeHtml(s.sailNumber)}</td>
@@ -1075,12 +1308,24 @@ Canal de seguridad: 68 (bandera V).`;
   }
 
   function escapeHtml(v) {
-    return String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    return String(v ?? "").replace(
+      /[&<>"']/g,
+      (ch) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;"
+        })[ch]
+    );
   }
 
   function shareInscriptionLink() {
     const ev = currentEvent();
-    const q = ev ? `?mode=register&fecha=${encodeURIComponent(ev.id)}` : "?mode=register";
+    const q = ev
+      ? `?mode=register&fecha=${encodeURIComponent(ev.id)}`
+      : "?mode=register";
     const url = `${location.origin}${location.pathname}${q}`;
     const text = ev
       ? `⛵ Inscripción ${ev.name} (${formatDay(ev.date)} ${ev.time}) · CNA Vela Ligera\n${url}`
@@ -1091,9 +1336,18 @@ Canal de seguridad: 68 (bandera V).`;
   async function sharePlacaPng() {
     toast("Generando captura…");
     const node = document.getElementById("exportableCard");
-    const canvas = await html2canvas(node, { backgroundColor: "#073A5A", scale: 2, useCORS: true });
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-    const name = currentTab === "ranking" ? "Ranking_General_CNA.png" : `Placa_${currentEvent()?.name || "fecha"}_CNA.png`;
+    const canvas = await html2canvas(node, {
+      backgroundColor: "#073A5A",
+      scale: 2,
+      useCORS: true
+    });
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/png")
+    );
+    const name =
+      currentTab === "ranking"
+        ? "Ranking_General_CNA.png"
+        : `Placa_${currentEvent()?.name || "fecha"}_CNA.png`;
     const file = new File([blob], name, { type: "image/png" });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
@@ -1125,7 +1379,9 @@ Canal de seguridad: 68 (bandera V).`;
       sessionStorage.removeItem(ADMIN_KEY);
       toast("Sesión de comisión cerrada");
       render();
-    } else if (confirm("¿Borrar inscriptos, fechas y resultados de ESTE celular?")) {
+    } else if (
+      confirm("¿Borrar inscriptos, fechas y resultados de ESTE celular?")
+    ) {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(LEGACY_KEY);
       location.reload();
@@ -1142,7 +1398,8 @@ Canal de seguridad: 68 (bandera V).`;
     renderFechasTab();
     renderBoatClasses();
     renderCarga();
-    if (currentTab === "placa" || currentTab === "ranking") renderPlacaOrRanking();
+    if (currentTab === "placa" || currentTab === "ranking")
+      renderPlacaOrRanking();
   }
 
   window.switchTab = switchTab;
@@ -1172,10 +1429,13 @@ Canal de seguridad: 68 (bandera V).`;
   document.addEventListener("DOMContentLoaded", () => {
     const params = new URLSearchParams(location.search);
     const fechaParam = params.get("fecha");
-    if (fechaParam && eventList().some((e) => e.id === fechaParam)) state.fecha = fechaParam;
+    if (fechaParam && eventList().some((e) => e.id === fechaParam))
+      state.fecha = fechaParam;
     fillCategories();
     resetFechaForm();
-    switchTab(params.get("mode") === "register" ? "inscripcion" : "inscripcion");
+    switchTab(
+      params.get("mode") === "register" ? "inscripcion" : "inscripcion"
+    );
     initAppwrite();
     window.addEventListener("online", () => {
       toast("Red disponible: sincronizando…");
