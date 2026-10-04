@@ -23,14 +23,29 @@ export const DEFAULT_BOAT_CLASSES: BoatClass[] = [
 ];
 
 export const DEFAULT_AR: RaceDoc = {
-  name: "AR_VELA_LIGERA.docx",
-  href: "/docs/AR_VELA_LIGERA.docx"
+  name: "AR_VELA_LIGERA.pdf",
+  href: "/docs/AR_VELA_LIGERA.pdf"
 };
 
 export const DEFAULT_IR: RaceDoc = {
-  name: "IR_VELA_LIGERA.docx",
-  href: "/docs/IR_VELA_LIGERA.docx"
+  name: "IR_VELA_LIGERA.pdf",
+  href: "/docs/IR_VELA_LIGERA.pdf"
 };
+
+function legacyPdf(doc: RaceDoc): RaceDoc | undefined {
+  const href = doc.href || "";
+  const name = doc.name || "";
+  if (href.endsWith("AR_VELA_LIGERA.docx") || name === "AR_VELA_LIGERA.docx") return { ...DEFAULT_AR };
+  if (href.endsWith("IR_VELA_LIGERA.docx") || name === "IR_VELA_LIGERA.docx") return { ...DEFAULT_IR };
+  return undefined;
+}
+
+/** Las fechas ya publicadas apuntan al Word original. La descarga usa el PDF. */
+export function bundledDoc(doc: RaceDoc | undefined, kind: "ar" | "ir"): RaceDoc {
+  if (!doc) return defaultDoc(kind);
+  if (doc.dataUrl) return doc;
+  return legacyPdf(doc) || doc;
+}
 
 export const DEFAULT_WHATSAPP = "https://chat.whatsapp.com/EZWmFlBaIYZCyw7pdwecob";
 

@@ -241,7 +241,7 @@ export function FechasView({
                   key={`ar-${fileEpoch}`}
                   name="ar"
                   type="file"
-                  accept=".pdf,.doc,.docx,application/pdf"
+                  accept=".pdf,application/pdf"
                   className="mt-1 w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-cyan-500 file:text-sea-900 file:font-bold file:px-2 file:py-1"
                 />
                 <span className="mt-1 block text-[10px] text-slate-500">{arHint}</span>
@@ -251,7 +251,7 @@ export function FechasView({
                   key={`ir-${fileEpoch}`}
                   name="ir"
                   type="file"
-                  accept=".pdf,.doc,.docx,application/pdf"
+                  accept=".pdf,application/pdf"
                   className="mt-1 w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-cyan-500 file:text-sea-900 file:font-bold file:px-2 file:py-1"
                 />
                 <span className="mt-1 block text-[10px] text-slate-500">{irHint}</span>

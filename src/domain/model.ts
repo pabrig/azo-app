@@ -1,4 +1,4 @@
-import { defaultBoatClasses, defaultDoc, DEFAULT_AVISOS, DEFAULT_WHATSAPP } from "./defaults";
+import { bundledDoc, defaultBoatClasses, DEFAULT_AVISOS, DEFAULT_WHATSAPP } from "./defaults";
 import type { BoatClass, ChampionshipState, Fecha, Sailor } from "./types";
 
 export function uid() {
@@ -18,8 +18,8 @@ export function makeFecha(partial: Partial<Fecha> = {}): Fecha {
     date: partial.date || "",
     time: partial.time || "12:00",
     avisos: partial.avisos || DEFAULT_AVISOS,
-    ar: partial.ar || defaultDoc("ar"),
-    ir: partial.ir || defaultDoc("ir"),
+    ar: bundledDoc(partial.ar, "ar"),
+    ir: bundledDoc(partial.ir, "ir"),
     racesCount: partial.racesCount || 3,
     scores: partial.scores || {}
   };

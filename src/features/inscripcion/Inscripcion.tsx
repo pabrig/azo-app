@@ -85,7 +85,7 @@ export function Inscripcion() {
       onSubmit={onSubmit}
       onDownload={(kind) => {
         const doc = event?.[kind];
-        if (!downloadDoc(doc, kind === "ar" ? "AR.docx" : "IR.docx")) {
+        if (!downloadDoc(doc, kind === "ar" ? "AR.pdf" : "IR.pdf")) {
           api.showToast("No hay archivo cargado");
         }
       }}

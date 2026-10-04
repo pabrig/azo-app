@@ -18,8 +18,16 @@ const emptyClass = (): ClassFormState => ({ original: "", name: "", categories: 
 
 function docHint(name?: string) {
   return name
-    ? `Actual: ${name}. Si no elegís archivo, se mantiene.`
-    : "Si no elegís archivo, se mantiene el actual.";
+    ? `Actual: ${name}. Si no elegís un PDF, se mantiene.`
+    : "Subí un PDF. Si no elegís archivo, se mantiene el actual.";
+}
+
+function pdfUpload(value: FormDataEntryValue | null) {
+  if (!(value instanceof File) || !value.size) return undefined;
+  const pdf = value.type === "application/pdf" || value.name.toLowerCase().endsWith(".pdf");
+  if (!pdf) throw new Error("AR e IR se publican en PDF");
+  const name = value.name.toLowerCase().endsWith(".pdf") ? value.name : `${value.name}.pdf`;
+  return { name, file: value };
 }
 
 export function Fechas() {
@@ -55,8 +63,10 @@ export function Fechas() {
     const arFile = data.get("ar");
     const irFile = data.get("ir");
     try {
-      const ar = arFile instanceof File && arFile.size ? { name: arFile.name, dataUrl: await readFileAsDataUrl(arFile) } : undefined;
-      const ir = irFile instanceof File && irFile.size ? { name: irFile.name, dataUrl: await readFileAsDataUrl(irFile) } : undefined;
+      const arUpload = pdfUpload(arFile);
+      const irUpload = pdfUpload(irFile);
+      const ar = arUpload ? { name: arUpload.name, dataUrl: await readFileAsDataUrl(arUpload.file) } : undefined;
+      const ir = irUpload ? { name: irUpload.name, dataUrl: await readFileAsDataUrl(irUpload.file) } : undefined;
       const saved = api.saveFecha({ ...fechaForm, ar, ir });
       if (saved) resetFecha();
     } catch (error) {
@@ -140,7 +150,7 @@ export function Fechas() {
       onDownload={(id, kind) => {
         const event = api.state.events.find((item) => item.id === id);
         const doc = event?.[kind];
-        if (!downloadDoc(doc, kind === "ar" ? "AR.docx" : "IR.docx")) api.showToast("No hay archivo cargado");
+        if (!downloadDoc(doc, kind === "ar" ? "AR.pdf" : "IR.pdf")) api.showToast("No hay archivo cargado");
       }}
     />
   );
