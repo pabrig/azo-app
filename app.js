@@ -279,6 +279,7 @@ Canal de seguridad: 68 (bandera V).`;
 
   function setSyncBadge(mode, label) {
     const el = document.getElementById("syncBadge");
+    if (!el) return;
     el.textContent = label;
     el.className =
       "text-[10px] px-2 py-1 rounded-full border font-semibold " +
@@ -286,7 +287,25 @@ Canal de seguridad: 68 (bandera V).`;
         ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
         : mode === "error"
           ? "border-wheel/40 bg-red-500/15 text-red-200"
-          : "border-amber-400/40 bg-amber-500/15 text-amber-200");
+          : "border-amber-400/40 bg-amber-500/15 text-amber-200") +
+      (isDevHost() ? "" : " hidden");
+  }
+
+  function isDevHost() {
+    const host = (location.hostname || "").toLowerCase();
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "[::1]" ||
+      new URLSearchParams(location.search).has("dev")
+    );
+  }
+
+  function renderHeaderChrome() {
+    const badge = document.getElementById("syncBadge");
+    const gear = document.getElementById("btnSettings");
+    if (badge) badge.classList.toggle("hidden", !isDevHost());
+    if (gear) gear.classList.toggle("hidden", !isAdmin());
   }
 
   function toast(msg) {
@@ -838,8 +857,24 @@ Canal de seguridad: 68 (bandera V).`;
     document.getElementById("evAvisos").value = ev.avisos || "";
     document.getElementById("evAr").value = "";
     document.getElementById("evIr").value = "";
+    setDocHints(ev);
     switchTab("fechas");
     document.getElementById("fechaForm").scrollIntoView({ behavior: "smooth" });
+  }
+
+  function setDocHints(ev) {
+    const arHint = document.getElementById("evArHint");
+    const irHint = document.getElementById("evIrHint");
+    if (arHint) {
+      arHint.textContent = ev?.ar?.name
+        ? `Actual: ${ev.ar.name}. Si no elegís archivo, se mantiene.`
+        : "Si no elegís archivo, se mantiene el actual.";
+    }
+    if (irHint) {
+      irHint.textContent = ev?.ir?.name
+        ? `Actual: ${ev.ir.name}. Si no elegís archivo, se mantiene.`
+        : "Si no elegís archivo, se mantiene el actual.";
+    }
   }
 
   function resetFechaForm() {
@@ -847,6 +882,7 @@ Canal de seguridad: 68 (bandera V).`;
     document.getElementById("editFechaId").value = "";
     document.getElementById("evAvisos").value = DEFAULT_AVISOS;
     document.getElementById("evTime").value = "12:00";
+    setDocHints(null);
   }
 
   function deleteFecha(id) {
@@ -956,14 +992,11 @@ Canal de seguridad: 68 (bandera V).`;
       return;
     }
     box.innerHTML = `
-      <div class="flex items-start justify-between gap-2">
-        <div>
-          <p class="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Próxima / seleccionada</p>
-          <h3 class="font-bold">${escapeHtml(ev.name)}</h3>
-          <p class="text-slate-300">${ev.date ? formatDay(ev.date) : "Día a confirmar"} · ${escapeHtml(ev.time || "")} hs</p>
-        </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Próxima / seleccionada</p>
+        <h3 class="font-bold">${escapeHtml(ev.name)}</h3>
+        <p class="text-slate-300">${ev.date ? formatDay(ev.date) : "Día a confirmar"} · ${escapeHtml(ev.time || "")} hs</p>
       </div>
-      <p class="text-xs text-slate-400 whitespace-pre-line">${escapeHtml(ev.avisos || "Sin avisos.")}</p>
       <div class="flex gap-2">
         <button type="button" class="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold" onclick="downloadDoc('${ev.id}','ar')">Descargar AR</button>
         <button type="button" class="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold" onclick="downloadDoc('${ev.id}','ir')">Descargar IR</button>
@@ -1115,11 +1148,10 @@ Canal de seguridad: 68 (bandera V).`;
               : ""
           }
         </div>
-        <p class="text-xs text-slate-400 whitespace-pre-line">${escapeHtml(ev.avisos || "Sin avisos.")}</p>
-        <p class="text-[11px] text-slate-500">AR: ${escapeHtml(ev.ar?.name || "—")} · IR: ${escapeHtml(ev.ir?.name || "—")}</p>
+        ${admin ? `<p class="text-[11px] text-slate-500">Archivo actual · AR: ${escapeHtml(ev.ar?.name || "—")} · IR: ${escapeHtml(ev.ir?.name || "—")}</p>` : ""}
         <div class="flex gap-2">
-          <button type="button" class="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold" onclick="downloadDoc('${ev.id}','ar')">AR</button>
-          <button type="button" class="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold" onclick="downloadDoc('${ev.id}','ir')">IR</button>
+          <button type="button" class="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold" onclick="downloadDoc('${ev.id}','ar')">Descargar AR</button>
+          <button type="button" class="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold" onclick="downloadDoc('${ev.id}','ir')">Descargar IR</button>
         </div>
       </article>`
       )
@@ -1365,30 +1397,14 @@ Canal de seguridad: 68 (bandera V).`;
     toast("Imagen descargada: adjuntála en WhatsApp");
   }
 
-  function openSettings() {
-    const msg = [
-      "Ajustes CNA Vela Ligera",
-      "",
-      isAdmin() ? "Comisión: desbloqueada" : "Comisión: bloqueada (PIN)",
-      appwriteReady ? "Datos: Appwrite (nube)" : "Datos: solo este celular",
-      "",
-      "OK = cerrar sesión de comisión",
-      "Cancelar = borrar datos locales de prueba"
-    ].join("\n");
-    if (confirm(msg)) {
-      sessionStorage.removeItem(ADMIN_KEY);
-      toast("Sesión de comisión cerrada");
-      render();
-    } else if (
-      confirm("¿Borrar inscriptos, fechas y resultados de ESTE celular?")
-    ) {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(LEGACY_KEY);
-      location.reload();
-    }
+  function logoutCommission() {
+    sessionStorage.removeItem(ADMIN_KEY);
+    toast("Sesión de comisión cerrada");
+    render();
   }
 
   function render() {
+    renderHeaderChrome();
     renderCanalOficial();
     renderFechaBar();
     fillBoatClassSelect();
@@ -1416,7 +1432,7 @@ Canal de seguridad: 68 (bandera V).`;
   window.saveWhatsappChannel = saveWhatsappChannel;
   window.shareInscriptionLink = shareInscriptionLink;
   window.sharePlacaPng = sharePlacaPng;
-  window.openSettings = openSettings;
+  window.logoutCommission = logoutCommission;
   window.downloadDoc = downloadDoc;
   window.saveFechaForm = saveFechaForm;
   window.resetFechaForm = resetFechaForm;
