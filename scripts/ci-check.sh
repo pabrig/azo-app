@@ -33,9 +33,10 @@ if ! grep -q 'script src="appwrite-config.js"' index.html; then
   exit 1
 fi
 
-if git grep -nE 'sk_live_|sk-ant-|ghp_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}|-----BEGIN (RSA |OPENSSH )?PRIVATE KEY-----' -- . ':!.github/**' >/dev/null; then
+# Pattern is split so this script does not match itself.
+secret_pat="sk_live_|sk[-]ant[-]|ghp_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}|-----BEGIN (RSA |OPENSSH )?PRIVATE KEY-----"
+if git grep -nE "$secret_pat" -- . ':!.github/**' ':!scripts/ci-check.sh'; then
   echo "possible high-risk secret in tracked files" >&2
-  git grep -nE 'sk_live_|sk-ant-|ghp_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}|-----BEGIN (RSA |OPENSSH )?PRIVATE KEY-----' -- . ':!.github/**' >&2 || true
   exit 1
 fi
 
