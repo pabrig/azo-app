@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#073A5A">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>CNA · Vela Ligera</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/cna-insignia.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sea: { 900: "#05283D", 800: "#073A5A", 700: "#0A4F78", 500: "#1A7AAB" },
+            cyan: { 400: "#3DB8E8", 500: "#2EB5E0" },
+            wheel: "#D61F26"
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@18.2.0"></script>
+  <style>
+    :root { --nav-h: 4.25rem; }
+    html, body { height: 100%; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      background: #05283D;
+    }
+    .app-shell { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px)); }
+    .sticky-col { position: sticky; left: 0; z-index: 10; }
+    .sticky-col-header { position: sticky; left: 0; z-index: 20; }
+    input, select, button, textarea { font-size: 16px; }
+    ::-webkit-scrollbar { height: 5px; width: 5px; }
+    ::-webkit-scrollbar-thumb { background: #1A7AAB; border-radius: 4px; }
+  </style>
+</head>
+<body class="text-slate-100 antialiased">
+  <div class="app-shell min-h-full flex flex-col">
+    <header class="sticky top-0 z-30 bg-sea-800/95 backdrop-blur border-b border-white/10">
+      <div class="max-w-3xl mx-auto px-3 py-2.5 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <img src="assets/cna-insignia.png" alt="Club Náutico Azopardo" class="h-11 w-11 rounded-xl object-cover bg-white shadow">
+          <div class="min-w-0">
+            <h1 class="font-bold text-sm tracking-wide truncate">Club Náutico Azopardo</h1>
+            <p class="text-[11px] text-cyan-400 truncate">Campeonato Vela Ligera</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <span id="syncBadge" class="text-[10px] px-2 py-1 rounded-full border border-amber-400/40 bg-amber-500/15 text-amber-200 font-semibold">Local</span>
+          <button type="button" onclick="openSettings()" class="p-2 rounded-xl text-slate-400" aria-label="Ajustes">⚙</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-3xl w-full mx-auto px-3 py-3 space-y-3">
+      <section id="canalOficial" class="rounded-2xl border border-emerald-500/25 bg-sea-800 px-3 py-2.5">
+        <div class="flex items-center gap-2.5">
+          <span class="shrink-0 w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center" aria-hidden="true">
+            <svg class="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 1.8c4.46 0 8.11 3.65 8.11 8.11 0 4.47-3.65 8.11-8.11 8.11-1.42 0-2.8-.37-4.01-1.06l-.29-.17-3.12.82.83-3.04-.18-.3a8.07 8.07 0 0 1-1.23-4.36c0-4.46 3.65-8.11 8.11-8.11zm4.62 10.45c-.25-.13-1.5-.74-1.73-.82-.23-.09-.4-.13-.57.13-.17.25-.65.82-.8 1-.15.17-.3.2-.55.07-.25-.13-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.15-.25-.02-.38.11-.51.12-.12.25-.3.38-.45.12-.15.17-.25.25-.42.08-.17.04-.32-.02-.45-.07-.13-.57-1.37-.78-1.88-.2-.48-.41-.42-.57-.42h-.48c-.17 0-.45.06-.68.32-.23.25-.9.88-.9 2.14s.92 2.48 1.05 2.65c.13.17 1.81 2.76 4.39 3.87 1.64.71 2.28.77 3.1.65.47-.07 1.5-.61 1.71-1.2.21-.59.21-1.1.15-1.2-.06-.11-.23-.17-.48-.3z"/></svg>
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="text-[10px] font-bold uppercase tracking-wide text-emerald-400">Canal oficial · TOA</p>
+            <p class="text-xs text-slate-300 leading-snug">Informes de la Comisión solo por este grupo.</p>
+          </div>
+          <button type="button" onclick="openOfficialWhatsApp()" class="shrink-0 bg-emerald-500 text-sea-900 font-bold text-xs px-3 py-2 rounded-xl active:scale-95">Abrir</button>
+          <button type="button" id="btnEditarCanal" onclick="focusWhatsappEditor()" class="hidden shrink-0 text-[10px] text-slate-500 px-1">Editar</button>
+        </div>
+      </section>
+
+      <div id="fechaBarWrap" class="bg-sea-900/80 p-1.5 rounded-2xl border border-white/10">
+        <div id="fechaBar" class="flex gap-1 overflow-x-auto"></div>
+      </div>
+
+      <section id="view-inscripcion" class="app-view space-y-3">
+        <div id="fechaBrief" class="bg-sea-800 rounded-2xl p-4 border border-white/10 space-y-2 text-sm"></div>
+        <form id="inscripcionForm" class="bg-sea-800 rounded-2xl p-4 border border-white/10 space-y-3 shadow-lg" onsubmit="handleInscripcion(event)">
+          <div class="flex items-center justify-between">
+            <h2 class="font-bold">Inscripción</h2>
+            <span class="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Timonel</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <label class="block col-span-2 sm:col-span-1">
+              <span class="text-[11px] uppercase text-slate-400 font-semibold">Nº vela *</span>
+              <input id="regSail" required autocomplete="off" placeholder="ARG 21054" class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5">
+            </label>
+            <label class="block col-span-2 sm:col-span-1">
+              <span class="text-[11px] uppercase text-slate-400 font-semibold">Clase *</span>
+              <select id="regClass" class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5" onchange="fillCategories()"></select>
+            </label>
+          </div>
+          <label class="block">
+            <span class="text-[11px] uppercase text-slate-400 font-semibold">Nombre del timonel *</span>
+            <input id="regName" required autocomplete="name" placeholder="Nombre y apellido" class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5">
+          </label>
+          <div class="grid grid-cols-2 gap-2.5">
+            <label class="block">
+              <span class="text-[11px] uppercase text-slate-400 font-semibold">Categoría</span>
+              <select id="regCategory" class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5"></select>
+            </label>
+            <label class="block">
+              <span class="text-[11px] uppercase text-slate-400 font-semibold">Club</span>
+              <input id="regClub" placeholder="CNA" class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5">
+            </label>
+          </div>
+          <label class="block">
+            <span class="text-[11px] uppercase text-slate-400 font-semibold">Fecha *</span>
+            <select id="regFecha" required class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5" onchange="setFecha(this.value)"></select>
+          </label>
+          <button type="submit" id="btnInscribir" class="w-full bg-cyan-500 text-sea-900 font-bold py-3 rounded-xl active:scale-[0.99]">Confirmar inscripción</button>
+        </form>
+
+        <div class="bg-sea-800 rounded-2xl p-4 border border-white/10">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-sm" id="listaInscriptosTitle">Inscriptos</h3>
+            <span id="countInscriptos" class="text-xs font-bold bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full">0</span>
+          </div>
+          <div id="listaInscriptos" class="divide-y divide-white/5"></div>
+        </div>
+      </section>
+
+      <section id="view-fechas" class="app-view hidden space-y-3">
+        <div id="canalAdmin" class="hidden bg-sea-800 rounded-2xl p-4 border border-emerald-500/25 space-y-3">
+          <h2 class="font-bold">Canal oficial WhatsApp</h2>
+          <p class="text-xs text-slate-400">Si el grupo cambia, actualizá el link. Todos los competidores verán el nuevo acceso al instante.</p>
+          <form id="whatsappForm" class="space-y-2.5" onsubmit="saveWhatsappChannel(event)">
+            <label class="block">
+              <span class="text-[11px] uppercase text-slate-400 font-semibold">Link del grupo (chat.whatsapp.com)</span>
+              <input id="waUrl" type="url" required placeholder="https://chat.whatsapp.com/…" class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5">
+            </label>
+            <button class="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl">Guardar canal oficial</button>
+          </form>
+        </div>
+        <div id="clasesAdmin" class="hidden bg-sea-800 rounded-2xl p-4 border border-white/10 space-y-3">
+          <h2 class="font-bold">Clases del campeonato</h2>
+          <p class="text-xs text-slate-400">Los timoneles ven estas clases al inscribirse. Categorías separadas por coma.</p>
+          <form id="claseForm" class="space-y-2" onsubmit="saveBoatClass(event)">
+            <input type="hidden" id="editClassOriginal">
+            <label class="block">
+              <span class="text-[11px] uppercase text-slate-400 font-semibold">Nombre de la clase *</span>
+              <input id="clsName" required placeholder="ILCA 6" class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5">
+            </label>
+            <label class="block">
+              <span class="text-[11px] uppercase text-slate-400 font-semibold">Categorías</span>
+              <input id="clsCats" placeholder="General, Junior, Master" class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5">
+            </label>
+            <button class="w-full bg-cyan-500 text-sea-900 font-bold py-2.5 rounded-xl">Guardar clase</button>
+          </form>
+          <div id="clasesAdminList" class="divide-y divide-white/5"></div>
+        </div>
+        <div id="clasesPublic" class="bg-sea-800 rounded-2xl p-4 border border-white/10">
+          <p class="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold mb-2">Clases a competir</p>
+          <div id="clasesPublicList" class="flex flex-wrap gap-1.5"></div>
+        </div>
+        <div id="fechasPublic" class="space-y-3"></div>
+        <div id="fechasAdmin" class="hidden bg-sea-800 rounded-2xl p-4 border border-white/10 space-y-3">
+          <h2 class="font-bold">Nueva fecha / editar</h2>
+          <p class="text-xs text-slate-400">PIN de comisión requerido. Podés reemplazar AR e IR si cambian.</p>
+          <form id="fechaForm" class="space-y-2.5" onsubmit="saveFechaForm(event)">
+            <input type="hidden" id="editFechaId">
+            <label class="block">
+              <span class="text-[11px] uppercase text-slate-400 font-semibold">Nombre *</span>
+              <input id="evName" required placeholder="Fecha 1" class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5">
+            </label>
+            <div class="grid grid-cols-2 gap-2.5">
+              <label class="block">
+                <span class="text-[11px] uppercase text-slate-400 font-semibold">Día *</span>
+                <input id="evDate" type="date" required class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5">
+              </label>
+              <label class="block">
+                <span class="text-[11px] uppercase text-slate-400 font-semibold">Hora largada *</span>
+                <input id="evTime" type="time" required class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5">
+              </label>
+            </div>
+            <label class="block">
+              <span class="text-[11px] uppercase text-slate-400 font-semibold">Avisos (TOA)</span>
+              <textarea id="evAvisos" rows="4" placeholder="Cambios de IR, horario, grupo WhatsApp…" class="mt-1 w-full bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5"></textarea>
+            </label>
+            <div class="grid grid-cols-2 gap-2.5">
+              <label class="block">
+                <span class="text-[11px] uppercase text-slate-400 font-semibold">AR (Aviso de Regata)</span>
+                <input id="evAr" type="file" accept=".pdf,.doc,.docx,application/pdf" class="mt-1 w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-cyan-500 file:text-sea-900 file:font-bold file:px-2 file:py-1">
+              </label>
+              <label class="block">
+                <span class="text-[11px] uppercase text-slate-400 font-semibold">IR (Instrucciones)</span>
+                <input id="evIr" type="file" accept=".pdf,.doc,.docx,application/pdf" class="mt-1 w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-cyan-500 file:text-sea-900 file:font-bold file:px-2 file:py-1">
+              </label>
+            </div>
+            <div class="flex gap-2">
+              <button class="flex-1 bg-cyan-500 text-sea-900 font-bold py-2.5 rounded-xl">Guardar fecha</button>
+              <button type="button" onclick="resetFechaForm()" class="px-4 bg-white/10 rounded-xl text-sm">Limpiar</button>
+            </div>
+          </form>
+        </div>
+        <div id="fechasLock" class="bg-sea-800 rounded-2xl p-4 border border-white/10 space-y-2">
+          <p class="text-sm text-slate-400">Para crear o cambiar fechas, clases, canal WhatsApp y AR/IR, ingresá el PIN (pestaña Carga).</p>
+        </div>
+      </section>
+
+      <section id="view-carga" class="app-view hidden space-y-3">
+        <div id="cargaLock" class="bg-sea-800 rounded-2xl p-5 border border-white/10 space-y-3">
+          <h2 class="font-bold">Comisión de Regata</h2>
+          <p class="text-sm text-slate-400">PIN para cargar puestos, fechas, clases, canal WhatsApp y AR/IR.</p>
+          <form onsubmit="unlockAdmin(event)" class="flex gap-2">
+            <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" class="flex-1 bg-sea-900 border border-white/10 rounded-xl px-3 py-2.5">
+            <button class="bg-cyan-500 text-sea-900 font-bold px-4 rounded-xl">Entrar</button>
+          </form>
+        </div>
+        <div id="cargaPanel" class="hidden space-y-3">
+          <div class="bg-sea-800 rounded-2xl p-4 border border-white/10 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <h2 class="font-bold">Carga de resultados</h2>
+                <p id="cargaSubtitle" class="text-xs text-slate-400">Elegí una fecha</p>
+              </div>
+              <div class="flex gap-1.5">
+                <button type="button" onclick="addRace()" class="bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-xl">+ Regata</button>
+                <button type="button" onclick="removeRace()" class="bg-white/10 text-slate-300 text-xs font-bold px-3 py-2 rounded-xl">−</button>
+              </div>
+            </div>
+            <div id="classChipsCarga" class="flex gap-1.5 overflow-x-auto"></div>
+            <p class="text-[11px] text-slate-400">Puesto o código: DNC, DNS, OCS, DNF, DSQ.</p>
+            <div class="overflow-x-auto rounded-xl border border-white/10">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr id="cargaHead" class="bg-sea-900 text-slate-400"></tr>
+                </thead>
+                <tbody id="cargaBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-placa" class="app-view hidden space-y-3">
+        <button type="button" onclick="sharePlacaPng()" class="w-full bg-cyan-500 text-sea-900 font-bold text-xs py-2.5 rounded-xl">Compartir captura PNG</button>
+        <div id="classChipsPlaca" class="flex gap-1.5 overflow-x-auto no-export"></div>
+        <div id="exportableCard" class="bg-sea-800 rounded-2xl p-4 border border-white/10 space-y-3">
+          <div class="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <img src="assets/cna-insignia.png" alt="" class="h-12 w-12 rounded-lg object-cover bg-white">
+              <div>
+                <p class="text-[10px] uppercase tracking-widest text-cyan-400 font-bold">Club Náutico Azopardo</p>
+                <h2 id="cardTitle" class="font-black text-base leading-tight">PLACA DE POSICIONES</h2>
+                <p id="cardClass" class="text-xs text-slate-400">Todas las clases</p>
+              </div>
+            </div>
+            <span id="cardYear" class="text-[10px] font-mono bg-sea-900 border border-white/10 px-2 py-1 rounded-md"></span>
+          </div>
+          <div class="overflow-x-auto rounded-xl border border-white/10">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr id="placaHead" class="bg-sea-900 text-white"></tr>
+              </thead>
+              <tbody id="placaBody"></tbody>
+            </table>
+          </div>
+          <div class="flex justify-between text-[10px] text-slate-400 pt-1">
+            <span>Comisión de Regata · Cómputos</span>
+            <span id="cardStamp"></span>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-ranking" class="app-view hidden space-y-3">
+        <button type="button" onclick="sharePlacaPng()" class="w-full bg-cyan-500 text-sea-900 font-bold text-xs py-2.5 rounded-xl">Compartir captura PNG</button>
+        <div id="classChipsRanking" class="flex gap-1.5 overflow-x-auto no-export"></div>
+        <p class="text-[11px] text-slate-400 px-1">Suma de puntos netos de todas las fechas (menor puntaje gana). Descarte del peor resultado si una fecha tiene 4 o más regatas. El campeonato prevé un descarte según el AR.</p>
+      </section>
+    </main>
+  </div>
+
+  <nav class="fixed bottom-0 inset-x-0 z-40 bg-sea-800/95 backdrop-blur border-t border-white/10" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
+    <div class="max-w-lg mx-auto grid grid-cols-5 py-2 px-0.5">
+      <button type="button" class="nav-btn text-cyan-400 font-bold" data-tab="inscripcion" onclick="switchTab('inscripcion')">
+        <span class="block text-base leading-none">✎</span>
+        <span class="text-[9px]">Insc.</span>
+      </button>
+      <button type="button" class="nav-btn text-slate-400" data-tab="fechas" onclick="switchTab('fechas')">
+        <span class="block text-base leading-none">📅</span>
+        <span class="text-[9px]">Fechas</span>
+      </button>
+      <button type="button" class="nav-btn text-slate-400" data-tab="carga" onclick="switchTab('carga')">
+        <span class="block text-base leading-none">📋</span>
+        <span class="text-[9px]">Carga</span>
+      </button>
+      <button type="button" class="nav-btn text-slate-400" data-tab="placa" onclick="switchTab('placa')">
+        <span class="block text-base leading-none">🏁</span>
+        <span class="text-[9px]">Placa</span>
+      </button>
+      <button type="button" class="nav-btn text-slate-400" data-tab="ranking" onclick="switchTab('ranking')">
+        <span class="block text-base leading-none">🏆</span>
+        <span class="text-[9px]">Ranking</span>
+      </button>
+    </div>
+  </nav>
+
+  <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-cyan-500 text-sea-900 px-4 py-2 rounded-2xl text-xs font-bold shadow-xl opacity-0 pointer-events-none transition">Listo</div>
+
+  <script src="appwrite-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
