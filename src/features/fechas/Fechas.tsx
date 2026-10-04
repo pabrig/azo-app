@@ -1,0 +1,147 @@
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useChampionship } from "../../app/championship-context";
+import { downloadDoc } from "../../data/download-doc";
+import { readFileAsDataUrl } from "../../data/read-file";
+import { DEFAULT_AVISOS } from "../../domain/defaults";
+import { boatClasses, officialWhatsApp } from "../../domain/model";
+import { FechasView, type ClassFormState, type FechaFormState } from "./Fechas.view";
+
+const emptyFecha = (): FechaFormState => ({
+  id: "",
+  name: "",
+  date: "",
+  time: "12:00",
+  avisos: DEFAULT_AVISOS
+});
+
+const emptyClass = (): ClassFormState => ({ original: "", name: "", categories: "" });
+
+function docHint(name?: string) {
+  return name
+    ? `Actual: ${name}. Si no elegís archivo, se mantiene.`
+    : "Si no elegís archivo, se mantiene el actual.";
+}
+
+export function Fechas() {
+  const api = useChampionship();
+  const classes = boatClasses(api.state);
+  const [whatsappUrl, setWhatsappUrl] = useState(() => officialWhatsApp(api.state));
+  const [classForm, setClassForm] = useState<ClassFormState>(emptyClass);
+  const [fechaForm, setFechaForm] = useState<FechaFormState>(emptyFecha);
+  const [fileEpoch, setFileEpoch] = useState(0);
+  const whatsappRef = useRef<HTMLInputElement>(null);
+  const classFormRef = useRef<HTMLFormElement>(null);
+  const fechaFormRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (document.activeElement === whatsappRef.current) return;
+    setWhatsappUrl(officialWhatsApp(api.state));
+  }, [api.state]);
+
+  useEffect(() => {
+    if (!api.whatsappFocus) return;
+    whatsappRef.current?.focus();
+    whatsappRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [api.whatsappFocus]);
+
+  function resetFecha() {
+    setFechaForm(emptyFecha());
+    setFileEpoch((current) => current + 1);
+  }
+
+  async function onSaveFecha(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const arFile = data.get("ar");
+    const irFile = data.get("ir");
+    try {
+      const ar = arFile instanceof File && arFile.size ? { name: arFile.name, dataUrl: await readFileAsDataUrl(arFile) } : undefined;
+      const ir = irFile instanceof File && irFile.size ? { name: irFile.name, dataUrl: await readFileAsDataUrl(irFile) } : undefined;
+      const saved = api.saveFecha({ ...fechaForm, ar, ir });
+      if (saved) resetFecha();
+    } catch (error) {
+      api.showToast(error instanceof Error ? error.message : "No se pudo leer el archivo");
+    }
+  }
+
+  return (
+    <FechasView
+      isAdmin={api.isAdmin}
+      classes={classes}
+      events={api.state.events}
+      whatsappUrl={whatsappUrl}
+      whatsappRef={whatsappRef}
+      onWhatsappUrl={setWhatsappUrl}
+      onSaveWhatsapp={(event) => {
+        event.preventDefault();
+        api.saveWhatsapp(whatsappUrl);
+      }}
+      classForm={classForm}
+      classFormRef={classFormRef}
+      onClassForm={(patch) => setClassForm((current) => ({ ...current, ...patch }))}
+      onSaveClass={(event) => {
+        event.preventDefault();
+        const saved = api.saveBoatClass({
+          name: classForm.name,
+          original: classForm.original,
+          categories: classForm.categories
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+        });
+        if (saved) setClassForm(emptyClass());
+      }}
+      onEditClass={(name) => {
+        const found = classes.find((item) => item.name === name);
+        if (!found) return;
+        setClassForm({ original: found.name, name: found.name, categories: found.categories.join(", ") });
+        classFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }}
+      onDeleteClass={(name) => {
+        if (classes.length <= 1) {
+          api.showToast("Debe quedar al menos una clase");
+          return;
+        }
+        const used = api.state.sailors.filter((sailor) => sailor.boatClass === name).length;
+        const accepted = used
+          ? window.confirm(`Hay ${used} inscripto(s) en ${name}. ¿Borrar la clase igual?`)
+          : window.confirm(`¿Borrar la clase ${name}?`);
+        if (accepted) api.deleteBoatClass(name);
+      }}
+      fechaForm={fechaForm}
+      fechaFormRef={fechaFormRef}
+      fileEpoch={fileEpoch}
+      arHint={docHint(api.state.events.find((event) => event.id === fechaForm.id)?.ar?.name)}
+      irHint={docHint(api.state.events.find((event) => event.id === fechaForm.id)?.ir?.name)}
+      onFechaForm={(patch) => setFechaForm((current) => ({ ...current, ...patch }))}
+      onSaveFecha={onSaveFecha}
+      onResetFecha={resetFecha}
+      onEditFecha={(id) => {
+        const event = api.state.events.find((item) => item.id === id);
+        if (!event) return;
+        setFechaForm({
+          id: event.id,
+          name: event.name,
+          date: event.date,
+          time: event.time,
+          avisos: event.avisos || ""
+        });
+        setFileEpoch((current) => current + 1);
+        fechaFormRef.current?.scrollIntoView({ behavior: "smooth" });
+      }}
+      onDeleteFecha={(id) => {
+        if (api.state.events.length <= 1) {
+          api.showToast("Dejá al menos una fecha");
+          return;
+        }
+        if (!window.confirm("¿Eliminar esta fecha y sus resultados?")) return;
+        api.deleteFecha(id);
+      }}
+      onDownload={(id, kind) => {
+        const event = api.state.events.find((item) => item.id === id);
+        const doc = event?.[kind];
+        if (!downloadDoc(doc, kind === "ar" ? "AR.docx" : "IR.docx")) api.showToast("No hay archivo cargado");
+      }}
+    />
+  );
+}
