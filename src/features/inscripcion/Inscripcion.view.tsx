@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useEffect, useRef, type FormEvent } from "react";
 import type { Fecha, Sailor } from "../../domain/types";
 import { Card, Field, controlClass } from "../../ui/primitives";
 
@@ -34,6 +34,16 @@ export function InscripcionView({
   onDownload: (kind: "ar" | "ir") => void;
   onDelete: (id: string) => void;
 }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const previousCount = useRef(sailors.length);
+
+  useEffect(() => {
+    if (sailors.length > previousCount.current) {
+      listRef.current?.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    previousCount.current = sailors.length;
+  }, [sailors.length]);
+
   return (
     <div className="space-y-3">
       <Card className="space-y-2 text-sm">
@@ -151,7 +161,7 @@ export function InscripcionView({
           <h3 className="font-bold text-sm">{brief ? `Inscriptos · ${brief.name}` : "Inscriptos"}</h3>
           <span className="text-xs font-bold bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full">{sailors.length}</span>
         </div>
-        <div className="divide-y divide-white/5">
+        <div ref={listRef} className="divide-y divide-white/5">
           {!brief ? (
             <p className="py-6 text-center text-xs text-slate-500">Creá una fecha para empezar.</p>
           ) : sailors.length ? (

@@ -33,8 +33,8 @@ export function AppShellView({
   children: ReactNode;
 }) {
   return (
-    <div className="app-shell min-h-full flex flex-col">
-      <header className="sticky top-0 z-30 bg-sea-800/95 backdrop-blur border-b border-white/10">
+    <div className="app-shell">
+      <header className="shrink-0 z-30 bg-sea-800/95 backdrop-blur border-b border-white/10">
         <div className="max-w-3xl mx-auto px-3 py-2.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <img
@@ -61,7 +61,10 @@ export function AppShellView({
           </div>
         </div>
       </header>
-      <main className="flex-1 max-w-3xl w-full mx-auto px-3 py-3 space-y-3">
+      <main
+        className="flex-1 min-h-0 overflow-y-auto max-w-3xl w-full mx-auto px-3 py-3 space-y-3"
+        style={{ paddingBottom: "calc(var(--nav-h) + env(safe-area-inset-bottom, 0px))" }}
+      >
         {canal}
         {showFechaBar ? (
           <div className="bg-sea-900/80 p-1.5 rounded-2xl border border-white/10">
