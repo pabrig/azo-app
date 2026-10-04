@@ -54,8 +54,8 @@
           </div>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
-          <span id="syncBadge" class="text-[10px] px-2 py-1 rounded-full border border-amber-400/40 bg-amber-500/15 text-amber-200 font-semibold">Local</span>
-          <button type="button" onclick="openSettings()" class="p-2 rounded-xl text-slate-400" aria-label="Ajustes">⚙</button>
+          <span id="syncBadge" class="hidden text-[10px] px-2 py-1 rounded-full border border-amber-400/40 bg-amber-500/15 text-amber-200 font-semibold">Local</span>
+          <button type="button" id="btnSettings" onclick="logoutCommission()" class="hidden text-[11px] font-bold px-3 py-1.5 rounded-xl bg-white/10 text-slate-200">Salir</button>
         </div>
       </div>
     </header>
@@ -187,10 +187,12 @@
               <label class="block">
                 <span class="text-[11px] uppercase text-slate-400 font-semibold">AR (Aviso de Regata)</span>
                 <input id="evAr" type="file" accept=".pdf,.doc,.docx,application/pdf" class="mt-1 w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-cyan-500 file:text-sea-900 file:font-bold file:px-2 file:py-1">
+                <span id="evArHint" class="mt-1 block text-[10px] text-slate-500">Si no elegís archivo, se mantiene el actual.</span>
               </label>
               <label class="block">
                 <span class="text-[11px] uppercase text-slate-400 font-semibold">IR (Instrucciones)</span>
                 <input id="evIr" type="file" accept=".pdf,.doc,.docx,application/pdf" class="mt-1 w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-cyan-500 file:text-sea-900 file:font-bold file:px-2 file:py-1">
+                <span id="evIrHint" class="mt-1 block text-[10px] text-slate-500">Si no elegís archivo, se mantiene el actual.</span>
               </label>
             </div>
             <div class="flex gap-2">
