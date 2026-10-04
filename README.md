@@ -25,19 +25,45 @@ Tipo **Long text** (o Medium text si no aparece Long):
 
 ### Permisos de la tabla (Settings → Permissions)
 
-Marcá **Any** en Create, Read, Update y Delete.
+Marcá **Any** en Create, Read, Update y Delete. Es un club cerrado (amigos/familia): el PIN de comisión es un candado de UI, no autenticación real. Cualquiera con la URL puede leer y escribir el documento de Appwrite.
 
 ### Project ID
 
-En el menú **Overview** del proyecto `azoapp` copiá el Project ID y pegalo en `appwrite-config.js` (`CNA_APPWRITE_PROJECT_ID`). El Database ID `68e2a2b100201252c374` ya quedó cargado.
+En el menú **Overview** del proyecto `azoapp` copiá el Project ID y pegalo en `appwrite-config.js` (`CNA_APPWRITE_PROJECT_ID`). El Database ID ya quedó cargado.
 
-### Plataforma web
+### Plataforma web (origen)
 
-**Overview / Settings → Platforms → Add platform → Web**: `localhost`, `127.0.0.1` y después `TU_USUARIO.github.io`.
+**Overview / Settings → Platforms → Add platform → Web**, hostnames:
 
-## Publicar (GitHub Pages)
+- `localhost`
+- `127.0.0.1`
+- `*.vercel.app` (previews + producción Hobby)
+- el dominio custom de Vercel si más adelante hay uno
 
-`index.html` en la raíz. GitHub → Settings → Pages → branch `main` → `/ (root)`. Agregá el hostname `*.github.io` en Appwrite Platforms.
+Sin el hostname de Vercel, el celular va a mostrar **Sin nube** / 403.
+
+## Publicar (Vercel Hobby, costo cero)
+
+1. En [vercel.com/pablo-rigallis-projects](https://vercel.com/pablo-rigallis-projects) → **Add New… → Project** → importar `pabrig/azo-app`.
+2. Framework Preset: **Other**. Root: `.` Build Command vacío. Output: la raíz (static).
+3. Production Branch: `main` (cuando exista el merge). Hasta entonces podés apuntar producción a `chore/vercel-ci-security` o `feature/cna-vela-ligera`.
+4. Cada PR genera un preview `*.vercel.app` (incluido). HTTPS lo pone Vercel.
+
+La GitHub Action `CI` solo valida archivos y busca secretos obvios; **no despliega**. El deploy lo hace el GitHub integration de Vercel (sin token extra).
+
+## Contingencias mínimas
+
+| Riesgo | Qué hay | Qué hacer si pasa |
+|---|---|---|
+| Sin señal / 5G flojo | LocalStorage + reintento al volver online | Un solo celular de CR carga puestos |
+| Vercel caído | Sitio estático; los datos viven en Appwrite | Abrir el HTML local o el preview anterior |
+| Appwrite caído | Badge “Sin señal”; sigue el celular | Exportar/capturar placa; no borrar localStorage |
+| Escritura cruzada | Last-writer-wins en un solo documento | No editar comisión en dos teléfonos a la vez |
+| PIN filtrado | Está en el JS del cliente | Cambiar `CNA_ADMIN_PIN` y redeploy |
+
+## Publicar (alternativa GitHub Pages)
+
+`index.html` en la raíz. GitHub → Settings → Pages → branch `main` → `/ (root)`. Agregá `*.github.io` en Appwrite Platforms.
 
 ## Uso
 
