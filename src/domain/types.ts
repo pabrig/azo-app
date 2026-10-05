@@ -33,6 +33,13 @@ export type Sailor = {
   category: string;
   club: string;
   fechas?: string[];
+  updatedAt?: number;
+};
+
+export type RemovedSailor = {
+  sailNumber: string;
+  boatClass: string;
+  at: number;
 };
 
 export type ChampionshipState = {
@@ -42,6 +49,7 @@ export type ChampionshipState = {
   events: Fecha[];
   whatsappUrl: string;
   classes: BoatClass[];
+  removedSailors: RemovedSailor[];
 };
 
 export type SyncMode = "live" | "error" | "local";

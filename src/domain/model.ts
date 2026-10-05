@@ -85,8 +85,13 @@ export function defaultState(): ChampionshipState {
     sailors: [],
     events,
     whatsappUrl: DEFAULT_WHATSAPP,
-    classes: defaultBoatClasses()
+    classes: defaultBoatClasses(),
+    removedSailors: []
   };
+}
+
+export function sailorKey(sailor: { sailNumber: string; boatClass: string }) {
+  return `${sailor.sailNumber.trim().toUpperCase()}|${sailor.boatClass.trim()}`;
 }
 
 export function boatClasses(state: ChampionshipState): BoatClass[] {
@@ -155,6 +160,7 @@ export function normalizeLoadedState(parsed: Partial<ChampionshipState> | null |
     fecha,
     classFilter: typeof parsed.classFilter === "string" ? parsed.classFilter : "ALL",
     whatsappUrl: parsed.whatsappUrl || DEFAULT_WHATSAPP,
-    classes: migrateClasses(parsed.classes)
+    classes: migrateClasses(parsed.classes),
+    removedSailors: Array.isArray(parsed.removedSailors) ? parsed.removedSailors : []
   };
 }

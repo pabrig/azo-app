@@ -1,4 +1,4 @@
-import { boatClasses, makeFecha, officialWhatsApp, sailorFechas, uid } from "./model";
+import { boatClasses, makeFecha, officialWhatsApp, sailorFechas, sailorKey, uid } from "./model";
 import type { ChampionshipState, ClassSaveInput, Fecha, FechaSaveInput, RegisterInput } from "./types";
 
 export function selectFecha(state: ChampionshipState, id: string): ChampionshipState {
@@ -14,6 +14,10 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
   const sailNumber = input.sailNumber.trim().toUpperCase();
   const name = input.name.trim();
   const club = input.club.trim().toUpperCase() || "CNA";
+  const removedSailors = state.removedSailors.filter(
+    (stamp) => sailorKey(stamp) !== sailorKey({ sailNumber, boatClass: input.boatClass })
+  );
+  const updatedAt = Date.now();
   const existing = state.sailors.find(
     (sailor) => sailor.sailNumber === sailNumber && sailor.boatClass === input.boatClass
   );
@@ -24,6 +28,7 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
       state: selectFecha(
         {
           ...state,
+          removedSailors,
           sailors: state.sailors.map((sailor) =>
             sailor.id === existing.id
               ? {
@@ -31,7 +36,8 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
                   name,
                   category: input.category,
                   club,
-                  fechas: nextFechas
+                  fechas: nextFechas,
+                  updatedAt
                 }
               : sailor
           )
@@ -45,6 +51,7 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
     state: selectFecha(
       {
         ...state,
+        removedSailors,
         sailors: [
           ...state.sailors,
           {
@@ -54,7 +61,8 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
             name,
             category: input.category,
             club,
-            fechas: [input.fecha]
+            fechas: [input.fecha],
+            updatedAt
           }
         ]
       },
@@ -73,9 +81,17 @@ function label(state: ChampionshipState, id: string) {
 }
 
 export function removeSailor(state: ChampionshipState, id: string): ChampionshipState {
+  const sailor = state.sailors.find((item) => item.id === id);
+  const removedSailors = sailor
+    ? [
+        ...state.removedSailors.filter((stamp) => sailorKey(stamp) !== sailorKey(sailor)),
+        { sailNumber: sailor.sailNumber, boatClass: sailor.boatClass, at: Date.now() }
+      ]
+    : state.removedSailors;
   return {
     ...state,
-    sailors: state.sailors.filter((sailor) => sailor.id !== id),
+    removedSailors,
+    sailors: state.sailors.filter((item) => item.id !== id),
     events: state.events.map((event) => {
       if (!event.scores[id]) return event;
       const scores = { ...event.scores };
@@ -226,6 +242,7 @@ export function storedSnapshot(state: ChampionshipState) {
     sailors: state.sailors,
     events: state.events,
     whatsappUrl: officialWhatsApp(state),
-    classes: boatClasses(state)
+    classes: boatClasses(state),
+    removedSailors: state.removedSailors
   };
 }
