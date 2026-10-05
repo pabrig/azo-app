@@ -1,7 +1,9 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { APP_VERSION } from "../../app/release-notes";
+import type { SyncStatus, ToastState } from "../../app/championship-context";
 import type { TabId } from "../../domain/types";
 import { BottomNav, FechaBar, SyncBadge, Toast } from "../../ui/primitives";
-import type { SyncStatus, ToastState } from "../../app/championship-context";
+import { VersionNotesDialog } from "../../ui/VersionNotesDialog";
 
 export function AppShellView({
   sync,
@@ -32,6 +34,8 @@ export function AppShellView({
   canal: ReactNode;
   children: ReactNode;
 }) {
+  const [versionNotesOpen, setVersionNotesOpen] = useState(false);
+
   return (
     <div className="app-shell">
       <header className="shrink-0 z-30 bg-sea-800/95 backdrop-blur border-b border-white/10">
@@ -44,7 +48,15 @@ export function AppShellView({
             />
             <div className="min-w-0">
               <h1 className="font-bold text-sm tracking-wide truncate">Club Náutico Azopardo</h1>
-              <p className="text-[11px] text-cyan-400 truncate">Campeonato Vela Ligera</p>
+              <p className="text-[11px] text-cyan-400 truncate leading-tight">Campeonato Vela Ligera</p>
+              <button
+                type="button"
+                onClick={() => setVersionNotesOpen(true)}
+                className="text-[10px] text-slate-500 font-mono tabular-nums leading-tight mt-0.5 hover:text-slate-300"
+                aria-label={`Versión ${APP_VERSION}. Ver novedades`}
+              >
+                v{APP_VERSION}
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -75,6 +87,7 @@ export function AppShellView({
       </main>
       <BottomNav tab={tab} onChange={onTab} />
       <Toast text={toast.text} visible={toast.visible} />
+      <VersionNotesDialog open={versionNotesOpen} onClose={() => setVersionNotesOpen(false)} />
     </div>
   );
 }
