@@ -41,6 +41,7 @@ export function Fechas() {
   const [classForm, setClassForm] = useState<ClassFormState>(emptyClass);
   const [fechaForm, setFechaForm] = useState<FechaFormState>(emptyFecha);
   const [fileEpoch, setFileEpoch] = useState(0);
+  const [configOpen, setConfigOpen] = useState(true);
   const whatsappRef = useRef<HTMLInputElement>(null);
   const classFormRef = useRef<HTMLFormElement>(null);
   const fechaFormRef = useRef<HTMLFormElement>(null);
@@ -78,8 +79,9 @@ export function Fechas() {
       const irUpload = pdfUpload(irFile);
       const ar = arUpload ? { name: arUpload.name, dataUrl: await readFileAsDataUrl(arUpload.file) } : undefined;
       const ir = irUpload ? { name: irUpload.name, dataUrl: await readFileAsDataUrl(irUpload.file) } : undefined;
+      const wasNew = !fechaForm.id;
       const saved = api.saveFecha({ ...fechaForm, ar, ir });
-      if (saved) resetFecha();
+      if (saved && wasNew) resetFecha();
     } catch (error) {
       api.showToast(error instanceof Error ? error.message : "No se pudo leer el archivo");
     }
@@ -111,12 +113,19 @@ export function Fechas() {
             .filter(Boolean)
         });
         if (saved) setClassForm(emptyClass());
+        else if (classForm.original) setConfigOpen(true);
       }}
+      configOpen={configOpen}
+      onConfigOpenChange={setConfigOpen}
+      onCancelClassEdit={() => setClassForm(emptyClass())}
       onEditClass={(name) => {
         const found = classes.find((item) => item.name === name);
         if (!found) return;
+        setConfigOpen(true);
         setClassForm({ original: found.name, name: found.name, categories: found.categories.join(", ") });
-        classFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.setTimeout(() => {
+          classFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 50);
       }}
       onDeleteClass={(name) => {
         if (classes.length <= 1) {
@@ -134,6 +143,7 @@ export function Fechas() {
       fechaForm={fechaForm}
       fechaFormRef={fechaFormRef}
       fechaIsEdit={Boolean(fechaForm.id)}
+      editingFechaId={fechaForm.id}
       fileEpoch={fileEpoch}
       onBeginNewFecha={beginNewFecha}
       arHint={docHint(api.state.events.find((event) => event.id === fechaForm.id)?.ar?.name)}
@@ -152,7 +162,9 @@ export function Fechas() {
           avisos: event.avisos || ""
         });
         setFileEpoch((current) => current + 1);
-        fechaFormRef.current?.scrollIntoView({ behavior: "smooth" });
+        window.setTimeout(() => {
+          fechaFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 50);
       }}
       onDeleteFecha={(id) => {
         if (api.state.events.length <= 1) {

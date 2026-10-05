@@ -158,7 +158,7 @@ export function ChampionshipProvider({ children }: { children: ReactNode }) {
           return false;
         }
         commit(result.state);
-        showToast("Fecha guardada");
+        showToast(input.id ? "Fecha actualizada" : "Fecha guardada");
         return true;
       },
       deleteFecha(id: string) {
@@ -206,7 +206,7 @@ export function ChampionshipProvider({ children }: { children: ReactNode }) {
           return false;
         }
         commit(result.state);
-        showToast("Clase guardada");
+        showToast(input.original ? "Clase actualizada" : "Clase guardada");
         return true;
       },
       deleteBoatClass(name: string) {
