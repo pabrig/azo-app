@@ -163,9 +163,18 @@ export function ChampionshipProvider({ children }: { children: ReactNode }) {
       },
       deleteFecha(id: string) {
         if (!isAdmin) return false;
-        const next = deleteFecha(stateRef.current, id);
-        if (!next) {
+        const current = stateRef.current;
+        if (current.events.length <= 1) {
           showToast("Dejá al menos una fecha");
+          return false;
+        }
+        if (!current.events.some((event) => event.id === id)) {
+          showToast("No encontramos esa fecha. Actualizá la pantalla e intentá de nuevo.");
+          return false;
+        }
+        const next = deleteFecha(current, id);
+        if (!next) {
+          showToast("No se pudo eliminar la fecha");
           return false;
         }
         commit(next);
