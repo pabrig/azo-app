@@ -3,7 +3,7 @@ import { useChampionship } from "../../app/championship-context";
 import { downloadDoc } from "../../data/download-doc";
 import { readFileAsDataUrl } from "../../data/read-file";
 import { DEFAULT_AVISOS } from "../../domain/defaults";
-import { boatClasses, officialWhatsApp } from "../../domain/model";
+import { boatClasses, officialWhatsApp, suggestNextFechaName } from "../../domain/model";
 import { FechasView, type ClassFormState, type FechaFormState } from "./Fechas.view";
 
 const emptyFecha = (): FechaFormState => ({
@@ -55,6 +55,13 @@ export function Fechas() {
   function resetFecha() {
     setFechaForm(emptyFecha());
     setFileEpoch((current) => current + 1);
+  }
+
+  function beginNewFecha() {
+    const name = suggestNextFechaName(api.state.events);
+    setFechaForm({ ...emptyFecha(), name });
+    setFileEpoch((current) => current + 1);
+    fechaFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function onSaveFecha(event: FormEvent<HTMLFormElement>) {
@@ -120,7 +127,9 @@ export function Fechas() {
       }}
       fechaForm={fechaForm}
       fechaFormRef={fechaFormRef}
+      fechaIsEdit={Boolean(fechaForm.id)}
       fileEpoch={fileEpoch}
+      onBeginNewFecha={beginNewFecha}
       arHint={docHint(api.state.events.find((event) => event.id === fechaForm.id)?.ar?.name)}
       irHint={docHint(api.state.events.find((event) => event.id === fechaForm.id)?.ir?.name)}
       onFechaForm={(patch) => setFechaForm((current) => ({ ...current, ...patch }))}
@@ -144,7 +153,9 @@ export function Fechas() {
           api.showToast("Dejá al menos una fecha");
           return;
         }
-        if (!window.confirm("¿Eliminar esta fecha y sus resultados?")) return;
+        const event = api.state.events.find((item) => item.id === id);
+        const label = event?.name || "esta fecha";
+        if (!window.confirm(`¿Eliminar ${label} y sus resultados? No se puede deshacer.`)) return;
         api.deleteFecha(id);
       }}
       onDownload={(id, kind) => {
