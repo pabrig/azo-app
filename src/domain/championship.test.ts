@@ -84,13 +84,15 @@ describe("fechas y clases heredadas", () => {
     let state = defaultState();
     const fechaId = state.events[0].id;
     state = updateScore(state, "s1", 0, "4");
-    state = saveFecha(state, {
+    const result = saveFecha(state, {
       id: fechaId,
       name: "Fecha norte",
       date: "2026-11-01",
       time: "13:00",
       avisos: "Sin cambios"
     });
+    expect(result.error).toBeUndefined();
+    state = result.state!;
     expect(state.events[0].name).toBe("Fecha norte");
     expect(state.events[0].scores.s1).toEqual(["4"]);
     expect(state.events[0].racesCount).toBe(3);
