@@ -17,6 +17,8 @@ export function InscripcionView({
   categories,
   fechas,
   brief,
+  canRegister,
+  isAdmin,
   sailors,
   onChange,
   onSubmit,
@@ -26,8 +28,10 @@ export function InscripcionView({
   draft: InscripcionDraft;
   classes: string[];
   categories: string[];
-  fechas: { id: string; label: string }[];
+  fechas: { id: string; label: string; registrationClosed?: boolean }[];
   brief: Fecha | null;
+  canRegister: boolean;
+  isAdmin: boolean;
   sailors: { sailor: Sailor; fechas: string }[];
   onChange: (patch: Partial<InscripcionDraft>) => void;
   onSubmit: (event: FormEvent) => void;
@@ -72,6 +76,7 @@ export function InscripcionView({
       </Card>
 
       <div className="inscripcion-layout-main space-y-3 min-w-0">
+      {canRegister ? (
       <form onSubmit={onSubmit} className="bg-sea-800 rounded-2xl p-4 lg:p-5 border border-white/10 space-y-3 shadow-lg">
         <div className="flex items-center justify-between">
           <h2 className="font-bold">Inscripción</h2>
@@ -143,8 +148,9 @@ export function InscripcionView({
             className={controlClass}
           >
             {fechas.map((fecha) => (
-              <option key={fecha.id} value={fecha.id}>
+              <option key={fecha.id} value={fecha.id} disabled={fecha.registrationClosed}>
                 {fecha.label}
+                {fecha.registrationClosed ? " (cerrada)" : ""}
               </option>
             ))}
           </select>
@@ -157,6 +163,18 @@ export function InscripcionView({
           Confirmar inscripción
         </button>
       </form>
+      ) : (
+        <Card className="border-amber-400/25 bg-amber-500/5 space-y-2">
+          <h2 className="font-bold text-sm">Inscripción cerrada</h2>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Esta fecha ya se disputó. Como timonel podés consultar quién está inscripto y descargar AR/IR; la comisión
+            puede inscribir si hace falta.
+          </p>
+          {!isAdmin && brief?.date ? (
+            <p className="text-[11px] text-slate-500">Regata: {formatBriefDay(brief.date)}</p>
+          ) : null}
+        </Card>
+      )}
 
       <Card>
         <div className="flex items-center justify-between mb-2">
@@ -181,9 +199,11 @@ export function InscripcionView({
                     <p className="text-[10px] text-cyan-400/80">{fechaText}</p>
                   </div>
                 </div>
-                <button type="button" onClick={() => onDelete(sailor.id)} className="text-slate-500 text-xs px-2">
-                  ✕
-                </button>
+                {isAdmin ? (
+                  <button type="button" onClick={() => onDelete(sailor.id)} className="text-slate-500 text-xs px-2">
+                    ✕
+                  </button>
+                ) : null}
               </div>
             ))
           ) : (

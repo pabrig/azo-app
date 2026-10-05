@@ -6,6 +6,7 @@ import {
   classNames,
   currentEvent,
   fechaLabel,
+  isFechaRegistrationClosed,
   preferredClassName,
   sailorFechas,
   sailorsInFecha
@@ -45,8 +46,14 @@ export function Inscripcion() {
     }
   }, [api.state.fecha, draft.fecha]);
 
+  const registrationEvent =
+    api.state.events.find((item) => item.id === draft.fecha) ?? event ?? null;
+  const canRegister =
+    api.isAdmin || !registrationEvent || !isFechaRegistrationClosed(registrationEvent);
+
   function onSubmit(eventForm: FormEvent) {
     eventForm.preventDefault();
+    if (!canRegister) return;
     api.registerSailor({
       sailNumber: draft.sailNumber,
       boatClass: draft.boatClass,
@@ -74,10 +81,13 @@ export function Inscripcion() {
       categories={categories}
       fechas={api.state.events.map((item) => ({
         id: item.id,
-        label: fechaLabel(api.state.events, item.id)
+        label: fechaLabel(api.state.events, item.id),
+        registrationClosed: !api.isAdmin && isFechaRegistrationClosed(item)
       }))}
       brief={event}
+      canRegister={canRegister}
       sailors={sailors}
+      isAdmin={api.isAdmin}
       onChange={(patch) => {
         if (patch.fecha) api.setFecha(patch.fecha);
         setDraft((current) => ({ ...current, ...patch }));

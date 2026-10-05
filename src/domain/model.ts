@@ -18,6 +18,21 @@ export function formatDay(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
+/** Fecha local YYYY-MM-DD (inscripciones usan calendario del dispositivo). */
+export function todayLocalIso(now = new Date()) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Timoneles no pueden inscribirse si el día de regata ya pasó (mismo día aún permitido). */
+export function isFechaRegistrationClosed(fecha: Fecha, todayIso = todayLocalIso()) {
+  const day = fecha.date?.trim();
+  if (!day) return false;
+  return day < todayIso;
+}
+
 function resolveDiscardsAllowed(partial: Partial<Fecha>) {
   const racesCount = partial.racesCount || 3;
   const max = Math.max(0, racesCount - 1);

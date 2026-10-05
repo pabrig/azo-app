@@ -3,7 +3,7 @@ import { config } from "../config";
 import { createCloudSync, type CloudSync } from "../data/appwrite-sync";
 import { loadLocalState, persistLocal, readAdminSession, writeAdminSession } from "../data/local-store";
 import { mergeRemote } from "../domain/cloud";
-import { boatClasses, currentEvent } from "../domain/model";
+import { boatClasses, currentEvent, isFechaRegistrationClosed } from "../domain/model";
 import {
   addRace,
   deleteBoatClass,
@@ -113,6 +113,11 @@ export function ChampionshipProvider({ children }: { children: ReactNode }) {
       registerSailor(input: RegisterInput) {
         if (!currentEvent(stateRef.current)) {
           showToast("No hay fechas creadas");
+          return;
+        }
+        const targetFecha = stateRef.current.events.find((event) => event.id === input.fecha);
+        if (!isAdmin && targetFecha && isFechaRegistrationClosed(targetFecha)) {
+          showToast("Inscripción cerrada: esa fecha ya se disputó");
           return;
         }
         const result = registerSailor(stateRef.current, input);

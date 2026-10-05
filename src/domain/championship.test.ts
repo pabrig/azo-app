@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cloudPayload, cloudView, mergeClassesMeta, mergeRemote, syncFingerprint } from "./cloud";
-import { defaultState, migrateClasses, migrateEvents } from "./model";
+import { defaultState, isFechaRegistrationClosed, makeFecha, migrateClasses, migrateEvents } from "./model";
 import { dateNet, fleetSize, pointsFor, rankedForFecha, rankedOverall } from "./scoring";
 import {
   deleteBoatClass,
@@ -545,5 +545,14 @@ describe("inscripciones de varios dispositivos", () => {
     state = removeSailor(state, state.sailors[0].id);
     expect(state.sailors).toEqual([]);
     expect(state.removedSailors[0]).toMatchObject({ sailNumber: "ARG 9", boatClass: "ILCA 6" });
+  });
+});
+
+describe("inscripción competidor", () => {
+  it("fecha pasada cierra inscripción; mismo día o futuro no", () => {
+    expect(isFechaRegistrationClosed(makeFecha({ date: "2020-06-01" }), "2025-06-02")).toBe(true);
+    expect(isFechaRegistrationClosed(makeFecha({ date: "2025-06-02" }), "2025-06-02")).toBe(false);
+    expect(isFechaRegistrationClosed(makeFecha({ date: "2025-06-03" }), "2025-06-02")).toBe(false);
+    expect(isFechaRegistrationClosed(makeFecha({ date: "" }), "2025-06-02")).toBe(false);
   });
 });

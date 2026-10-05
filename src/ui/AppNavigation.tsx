@@ -11,18 +11,18 @@ function NavTabButton({
   item: (typeof APP_TABS)[number];
   selected: boolean;
   onChange: (tab: TabId) => void;
-  variant: "bottom" | "side";
+  variant: "bottom" | "top";
 }) {
   return (
     <button
       type="button"
       onClick={() => onChange(item.id)}
       aria-current={selected ? "page" : undefined}
-      aria-label={item.label}
-      className={`nav-tab ${variant === "side" ? "nav-tab--side" : ""} ${selected ? "nav-tab--active" : ""}`}
+      title={item.label}
+      className={`nav-tab nav-tab--${variant} ${selected ? "nav-tab--active" : ""}`}
     >
       <span className="nav-tab-icon">
-        <TabNavIcon tab={item.id} size={variant === "side" ? 22 : 20} />
+        <TabNavIcon tab={item.id} size={variant === "top" ? 18 : 20} />
       </span>
       <span className="nav-tab-label nav-tab-label--full">{item.label}</span>
       <span className="nav-tab-label nav-tab-label--short">{item.shortLabel}</span>
@@ -32,7 +32,7 @@ function NavTabButton({
 
 export function BottomNav({ tab, onChange }: { tab: TabId; onChange: (tab: TabId) => void }) {
   return (
-    <nav className="app-bottom-nav" aria-label="Secciones principales">
+    <nav className="app-bottom-nav lg:hidden" aria-label="Secciones principales">
       <div className="app-bottom-nav-inner">
         {APP_TABS.map((item) => (
           <NavTabButton key={item.id} item={item} selected={item.id === tab} onChange={onChange} variant="bottom" />
@@ -42,13 +42,13 @@ export function BottomNav({ tab, onChange }: { tab: TabId; onChange: (tab: TabId
   );
 }
 
-export function SideNav({ tab, onChange }: { tab: TabId; onChange: (tab: TabId) => void }) {
+/** Barra horizontal bajo el header (solo desktop). */
+export function TopNav({ tab, onChange }: { tab: TabId; onChange: (tab: TabId) => void }) {
   return (
-    <nav className="app-side-nav" aria-label="Secciones principales">
-      <p className="app-side-nav-title">Menú</p>
-      <div className="app-side-nav-list">
+    <nav className="app-top-nav-wrap hidden lg:block" aria-label="Secciones principales">
+      <div className="app-top-nav">
         {APP_TABS.map((item) => (
-          <NavTabButton key={item.id} item={item} selected={item.id === tab} onChange={onChange} variant="side" />
+          <NavTabButton key={item.id} item={item} selected={item.id === tab} onChange={onChange} variant="top" />
         ))}
       </div>
     </nav>

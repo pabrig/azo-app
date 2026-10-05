@@ -87,4 +87,4 @@ export function FechaBar({
   );
 }
 
-export { BottomNav, SideNav } from "./AppNavigation";
+export { BottomNav, TopNav } from "./AppNavigation";
