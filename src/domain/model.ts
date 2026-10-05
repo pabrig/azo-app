@@ -1,5 +1,5 @@
 import { bundledDoc, defaultBoatClasses, DEFAULT_AVISOS, DEFAULT_WHATSAPP } from "./defaults";
-import type { BoatClass, ChampionshipState, Fecha, Sailor } from "./types";
+import type { BoatClass, ChampionshipState, Fecha, RemovedFecha, Sailor } from "./types";
 
 export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -103,6 +103,62 @@ export function fechaKey(fecha: { name: string; date: string }) {
   return `${normalizeName(fecha.name)}|${fecha.date}`;
 }
 
+export function suggestNextFechaName(events: Fecha[]) {
+  const used = new Set(events.map((event) => normalizeName(event.name)));
+  let index = events.length + 1;
+  while (used.has(normalizeName(`Fecha ${index}`))) index += 1;
+  return `Fecha ${index}`;
+}
+
+function mergeFechaRecords(a: Fecha, b: Fecha): Fecha {
+  const aAt = a.updatedAt || 0;
+  const bAt = b.updatedAt || 0;
+  let winner = a;
+  let loser = b;
+  if (bAt > aAt) {
+    winner = b;
+    loser = a;
+  } else if (bAt < aAt) {
+    winner = a;
+    loser = b;
+  } else if (a.id === SEED_FECHA_ID && b.id !== SEED_FECHA_ID) {
+    winner = a;
+    loser = b;
+  } else if (b.id === SEED_FECHA_ID && a.id !== SEED_FECHA_ID) {
+    winner = b;
+    loser = a;
+  }
+  const scoreAt = { ...(loser.scoreAt || {}), ...(winner.scoreAt || {}) };
+  return {
+    ...winner,
+    racesCount: Math.max(winner.racesCount || 0, loser.racesCount || 0),
+    scores: { ...loser.scores, ...winner.scores },
+    ...(Object.keys(scoreAt).length ? { scoreAt } : {})
+  };
+}
+
+/** Varias copias de “Fecha 1” con el mismo día (p. ej. por sync) quedan en una sola. */
+export function compactDuplicateFechas(events: Fecha[]) {
+  const byKey = new Map<string, Fecha>();
+  for (const event of events) {
+    const key = fechaKey(event);
+    const previous = byKey.get(key);
+    byKey.set(key, previous ? mergeFechaRecords(previous, event) : event);
+  }
+  return [...byKey.values()].sort(
+    (a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`) || a.id.localeCompare(b.id)
+  );
+}
+
+export function applyRemovedFechas(events: Fecha[], removed: RemovedFecha[]) {
+  const atById = new Map(removed.map((stamp) => [stamp.id, stamp.at]));
+  return events.filter((event) => {
+    const at = atById.get(event.id);
+    if (!at) return true;
+    return at <= (event.updatedAt || 0);
+  });
+}
+
 export function sailorKey(sailor: { sailNumber: string; boatClass: string }) {
   return `${sailor.sailNumber.trim().toUpperCase()}|${sailor.boatClass.trim()}`;
 }
@@ -185,7 +241,8 @@ export function preferredClassName(state: ChampionshipState) {
 
 export function normalizeLoadedState(parsed: Partial<ChampionshipState> | null | undefined): ChampionshipState {
   if (!parsed) return defaultState();
-  const events = migrateEvents(parsed.events);
+  const removedFechas = Array.isArray(parsed.removedFechas) ? parsed.removedFechas : [];
+  const events = compactDuplicateFechas(applyRemovedFechas(migrateEvents(parsed.events), removedFechas));
   const fecha = events.some((event) => event.id === parsed.fecha) ? parsed.fecha || "" : events[0]?.id || "";
   return {
     ...defaultState(),
@@ -197,7 +254,7 @@ export function normalizeLoadedState(parsed: Partial<ChampionshipState> | null |
     whatsappUrl: parsed.whatsappUrl || DEFAULT_WHATSAPP,
     classes: migrateClasses(parsed.classes),
     removedSailors: Array.isArray(parsed.removedSailors) ? parsed.removedSailors : [],
-    removedFechas: Array.isArray(parsed.removedFechas) ? parsed.removedFechas : [],
+    removedFechas,
     whatsappAt: typeof parsed.whatsappAt === "number" ? parsed.whatsappAt : 0,
     classesAt: typeof parsed.classesAt === "number" ? parsed.classesAt : 0
   };
