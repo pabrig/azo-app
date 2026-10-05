@@ -202,7 +202,8 @@ export function saveFecha(
       )
     : [...state.events, next];
   events.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
-  return { state: { ...state, events, fecha: next.id } };
+  const removedFechas = state.removedFechas.filter((stamp) => stamp.id !== next.id);
+  return { state: { ...state, events, fecha: next.id, removedFechas } };
 }
 
 export function deleteFecha(state: ChampionshipState, id: string): ChampionshipState | null {

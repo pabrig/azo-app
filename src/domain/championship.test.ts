@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cloudPayload, cloudView, mergeClassesMeta, mergeRemote, syncFingerprint } from "./cloud";
 import { defaultState, migrateClasses, migrateEvents } from "./model";
 import { dateNet, fleetSize, pointsFor, rankedForFecha } from "./scoring";
-import { deleteBoatClass, registerSailor, removeSailor, saveFecha, updateScore } from "./mutations";
+import { deleteBoatClass, deleteFecha, registerSailor, removeSailor, saveFecha, updateScore } from "./mutations";
 import type { ChampionshipState, Sailor } from "./types";
 
 describe("puntaje low point", () => {
@@ -117,6 +117,64 @@ describe("fechas y clases heredadas", () => {
     ];
     expect(mergeClassesMeta(local, 200, remote, 50).classes.map((item) => item.name)).toEqual(["ILCA 6"]);
     expect(mergeClassesMeta(local, 50, remote, 200).classes.map((item) => item.name)).toEqual(["ILCA 6", "Optimist"]);
+  });
+
+  it("elimina fechas en comisión y no las revive al sincronizar", () => {
+    let local = defaultState();
+    const created = saveFecha(local, {
+      id: "",
+      name: "Fecha 2",
+      date: "2026-11-02",
+      time: "12:00",
+      avisos: ""
+    });
+    local = created.state!;
+    const removedId = local.events.find((event) => event.name === "Fecha 2")!.id;
+    local = deleteFecha(local, removedId)!;
+    expect(local.events.some((event) => event.id === removedId)).toBe(false);
+
+    const remote = defaultState();
+    remote.events = [
+      ...remote.events,
+      {
+        ...remote.events[0],
+        id: removedId,
+        name: "Fecha 2",
+        date: "2026-11-02",
+        time: "12:00",
+        avisos: "",
+        updatedAt: 0
+      }
+    ];
+    const merged = mergeRemote(local, cloudRow(remote));
+    expect(merged.events.some((event) => event.id === removedId)).toBe(false);
+    expect(merged.removedFechas.some((stamp) => stamp.id === removedId)).toBe(true);
+  });
+
+  it("propaga fechas nuevas y ediciones entre dispositivos", () => {
+    let phoneA = defaultState();
+    phoneA = saveFecha(phoneA, {
+      id: "",
+      name: "Fecha 2",
+      date: "2026-11-02",
+      time: "12:00",
+      avisos: "Aviso A"
+    }).state!;
+    const fecha2Id = phoneA.events.find((event) => event.name === "Fecha 2")!.id;
+
+    const phoneB = defaultState();
+    let merged = mergeRemote(phoneB, cloudRow(phoneA));
+    expect(merged.events.some((event) => event.id === fecha2Id)).toBe(true);
+
+    phoneA = saveFecha(phoneA, {
+      id: fecha2Id,
+      name: "Fecha 2",
+      date: "2026-11-02",
+      time: "14:30",
+      avisos: "Cambio horario"
+    }).state!;
+    merged = mergeRemote(merged, cloudRow(phoneA));
+    expect(merged.events.find((event) => event.id === fecha2Id)?.time).toBe("14:30");
   });
 
   it("conserva resultados al editar una fecha", () => {
