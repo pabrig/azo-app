@@ -5,6 +5,7 @@ import {
   migrateClasses,
   migrateEvents,
   officialWhatsApp,
+  personKey,
   sailorKey,
   seedEvents
 } from "./model";
@@ -169,14 +170,43 @@ function parseRemoved(raw: unknown): RemovedSailor[] {
   return raw
     .map((item) => {
       if (!item || typeof item !== "object") return null;
-      const stamp = item as { sailNumber?: unknown; boatClass?: unknown; at?: unknown };
+      const stamp = item as { sailNumber?: unknown; boatClass?: unknown; name?: unknown; at?: unknown };
       const sailNumber = String(stamp.sailNumber || "").trim().toUpperCase();
       const boatClass = String(stamp.boatClass || "").trim();
+      const name = String(stamp.name || "").trim();
       const at = typeof stamp.at === "number" ? stamp.at : 0;
       if (!sailNumber || !boatClass || !at) return null;
-      return { sailNumber, boatClass, at };
+      const parsed: RemovedSailor = { sailNumber, boatClass, at };
+      if (name) parsed.name = name;
+      return parsed;
     })
     .filter((item): item is RemovedSailor => Boolean(item));
+}
+
+function stampKey(stamp: RemovedSailor) {
+  return stamp.name ? personKey({ name: stamp.name }) : sailorKey(stamp);
+}
+
+function shortHash(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/** Versiones viejas reusaban el id al pisar a otro timonel con la misma vela. */
+function uniqueIds(sailors: Sailor[]) {
+  const byId = new Map<string, Sailor[]>();
+  for (const sailor of sailors) byId.set(sailor.id, [...(byId.get(sailor.id) || []), sailor]);
+  return sailors.map((sailor) => {
+    const group = byId.get(sailor.id) || [];
+    if (group.length < 2) return sailor;
+    const keeper = [...group].sort(
+      (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0) || personKey(a).localeCompare(personKey(b))
+    )[0];
+    return sailor === keeper ? sailor : { ...sailor, id: `${sailor.id}-${shortHash(personKey(sailor))}` };
+  });
 }
 
 function canonicalSailors(sailors: Sailor[]) {
@@ -194,17 +224,21 @@ function canonicalSailors(sailors: Sailor[]) {
       if (sailor.updatedAt) packed.updatedAt = sailor.updatedAt;
       return packed;
     })
-    .sort((a, b) => sailorKey(a).localeCompare(sailorKey(b)) || a.id.localeCompare(b.id));
+    .sort((a, b) => personKey(a).localeCompare(personKey(b)) || a.id.localeCompare(b.id));
 }
 
 function canonicalRemoved(stamps: RemovedSailor[]) {
   return [...stamps]
-    .map((stamp) => ({
-      sailNumber: stamp.sailNumber.trim().toUpperCase(),
-      boatClass: stamp.boatClass.trim(),
-      at: stamp.at
-    }))
-    .sort((a, b) => sailorKey(a).localeCompare(sailorKey(b)));
+    .map((stamp) => {
+      const packed: RemovedSailor = {
+        sailNumber: stamp.sailNumber.trim().toUpperCase(),
+        boatClass: stamp.boatClass.trim(),
+        at: stamp.at
+      };
+      if (stamp.name?.trim()) packed.name = stamp.name.trim();
+      return packed;
+    })
+    .sort((a, b) => stampKey(a).localeCompare(stampKey(b)) || a.at - b.at);
 }
 
 function canonicalEvents(events: Fecha[]) {
@@ -224,26 +258,27 @@ function mergeSailors(
 ) {
   const removed = new Map<string, RemovedSailor>();
   for (const stamp of [...localRemoved, ...remoteRemoved]) {
-    const key = sailorKey(stamp);
+    const key = stampKey(stamp);
     const previous = removed.get(key);
-    if (!previous || stamp.at > previous.at) {
-      removed.set(key, {
-        sailNumber: stamp.sailNumber.trim().toUpperCase(),
-        boatClass: stamp.boatClass.trim(),
-        at: stamp.at
-      });
-    }
+    if (!previous || stamp.at > previous.at) removed.set(key, stamp);
   }
 
   const byKey = new Map<string, Sailor>();
   const idMap = new Map<string, string>();
+  const outranked = new Set<string>();
+
+  function removalAt(sailor: Sailor) {
+    const named = removed.get(personKey(sailor))?.at || 0;
+    const legacy = removed.get(sailorKey(sailor))?.at || 0;
+    return { named, legacy };
+  }
 
   function consider(sailor: Sailor, incoming: boolean) {
-    const key = sailorKey(sailor);
-    const stamp = removed.get(key);
+    const key = personKey(sailor);
     const at = sailor.updatedAt || 0;
-    if (stamp && stamp.at > at) return;
-    if (stamp && at >= stamp.at) removed.delete(key);
+    const { named, legacy } = removalAt(sailor);
+    if (Math.max(named, legacy) > at) return;
+    if (named) outranked.add(key);
     const existing = byKey.get(key);
     if (!existing) {
       byKey.set(key, { ...sailor, sailNumber: sailor.sailNumber.trim().toUpperCase() });
@@ -265,9 +300,10 @@ function mergeSailors(
 
   for (const sailor of local) consider(sailor, false);
   for (const sailor of remote) consider(sailor, true);
+  for (const key of outranked) removed.delete(key);
 
   return {
-    sailors: canonicalSailors([...byKey.values()]),
+    sailors: canonicalSailors(uniqueIds([...byKey.values()])),
     removedSailors: canonicalRemoved([...removed.values()]),
     idMap
   };

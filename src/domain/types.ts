@@ -39,6 +39,7 @@ export type Sailor = {
 export type RemovedSailor = {
   sailNumber: string;
   boatClass: string;
+  name?: string;
   at: number;
 };
 
