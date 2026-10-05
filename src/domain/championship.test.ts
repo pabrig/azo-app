@@ -258,6 +258,18 @@ describe("fechas y clases heredadas", () => {
     ]);
   });
 
+  it("actualiza categorías de una clase existente", () => {
+    let state = defaultState();
+    state.classes = [{ name: "ILCA 6", categories: ["General"] }];
+    const result = saveBoatClass(state, {
+      name: "ILCA 6",
+      original: "ILCA 6",
+      categories: ["Masculino", "Femenino", "General", "Master"]
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.state!.classes.find((item) => item.name === "ILCA 6")?.categories).toContain("Master");
+  });
+
   it("guarda categorías personalizadas al crear una clase", () => {
     const state = defaultState();
     const result = saveBoatClass(state, {

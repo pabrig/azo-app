@@ -258,7 +258,10 @@ export function saveBoatClass(
   const name = input.name.trim();
   if (!name) return { error: "Falta el nombre de la clase" };
   const categories = normalizeClassCategories(input.categories);
-  const list = boatClasses(state).map((item) => ({ ...item, categories: item.categories.slice() }));
+  const list = (state.classes.length ? state.classes : boatClasses(state)).map((item) => ({
+    ...item,
+    categories: item.categories.slice()
+  }));
   const duplicate = list.find(
     (item) => item.name.toLowerCase() === name.toLowerCase() && item.name !== input.original
   );
@@ -267,17 +270,14 @@ export function saveBoatClass(
   let classFilter = state.classFilter;
   if (input.original) {
     const index = list.findIndex((item) => item.name === input.original);
-    if (index >= 0) {
-      list[index] = { name, categories };
-      if (input.original !== name) {
-        const renamedAt = Date.now();
-        sailors = sailors.map((sailor) =>
-          sailor.boatClass === input.original ? { ...sailor, boatClass: name, updatedAt: renamedAt } : sailor
-        );
-        if (classFilter === input.original) classFilter = name;
-      }
-    } else {
-      list.push({ name, categories });
+    if (index < 0) return { error: "No encontramos esa clase. Tocá Editar de nuevo." };
+    list[index] = { name, categories };
+    if (input.original !== name) {
+      const renamedAt = Date.now();
+      sailors = sailors.map((sailor) =>
+        sailor.boatClass === input.original ? { ...sailor, boatClass: name, updatedAt: renamedAt } : sailor
+      );
+      if (classFilter === input.original) classFilter = name;
     }
   } else {
     list.push({ name, categories });

@@ -1,5 +1,4 @@
 import type { FormEvent, RefObject } from "react";
-import { effectiveDiscardsAllowed } from "../../domain/scoring";
 import type { BoatClass, Fecha } from "../../domain/types";
 import { Card, Field, controlClass } from "../../ui/primitives";
 
@@ -9,7 +8,6 @@ export type FechaFormState = {
   date: string;
   time: string;
   avisos: string;
-  discardsAllowed: number;
 };
 
 export type ClassFormState = {
@@ -44,7 +42,11 @@ export function FechasView({
   onBeginNewFecha,
   onEditFecha,
   onDeleteFecha,
-  onDownload
+  onDownload,
+  editingFechaId,
+  configOpen,
+  onConfigOpenChange,
+  onCancelClassEdit
 }: {
   isAdmin: boolean;
   classes: BoatClass[];
@@ -72,18 +74,23 @@ export function FechasView({
   onEditFecha: (id: string) => void;
   onDeleteFecha: (id: string) => void;
   onDownload: (id: string, kind: "ar" | "ir") => void;
+  editingFechaId: string;
+  configOpen: boolean;
+  onConfigOpenChange: (open: boolean) => void;
+  onCancelClassEdit: () => void;
 }) {
+  const classIsEdit = Boolean(classForm.original);
   return (
-    <div className="fechas-layout space-y-4 lg:space-y-5">
-      <header className="space-y-1 lg:col-span-2">
-        <h1 className="text-lg lg:text-xl font-bold tracking-tight">Fechas del campeonato</h1>
-        <p className="text-xs lg:text-sm text-slate-400 leading-relaxed max-w-2xl">
-          Día, hora, avisos y documentos AR/IR. Los timoneles descargan los PDF desde acá.
+    <div className="space-y-4">
+      <header className="space-y-1">
+        <h1 className="text-lg font-bold tracking-tight">Fechas del campeonato</h1>
+        <p className="text-xs text-slate-400 leading-relaxed">
+          Día, hora, avisos y documentos AR/IR. Las clases y categorías se editan abajo (no dependen de una fecha).
         </p>
       </header>
 
       {classes.length ? (
-        <div className="fechas-class-tags flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {classes.map((item) => (
             <span key={item.name} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/10 text-slate-200">
               {item.name}
@@ -94,26 +101,118 @@ export function FechasView({
         <p className="text-xs text-slate-500">Sin clases definidas todavía.</p>
       )}
 
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-slate-200">
+          Calendario {events.length ? `(${events.length})` : ""}
+        </h2>
+        {isAdmin && fechaIsEdit ? (
+          <p className="text-[11px] text-cyan-300/90">La fecha marcada en cyan es la que estás modificando abajo.</p>
+        ) : null}
+        {events.length ? (
+          events.map((event) => {
+            const isEditing = isAdmin && event.id === editingFechaId;
+            return (
+              <article
+                key={event.id}
+                className={`rounded-2xl p-4 space-y-2.5 transition-colors ${
+                  isEditing
+                    ? "bg-cyan-500/10 border-2 border-cyan-400 shadow-[0_0_0_1px_rgba(45,181,224,0.25)]"
+                    : "bg-sea-800/80 border border-white/10"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    {isEditing ? (
+                      <span className="inline-block text-[10px] font-bold uppercase tracking-wide text-sea-900 bg-cyan-400 px-2 py-0.5 rounded-md mb-1.5">
+                        En edición
+                      </span>
+                    ) : null}
+                    <h3 className="font-bold">{event.name}</h3>
+                    <p className="text-sm text-cyan-400">
+                      {event.date ? formatDay(event.date) : "Sin día"} · {event.time || "—"} hs
+                    </p>
+                  </div>
+                  {isAdmin ? (
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => onEditFecha(event.id)}
+                        className={`text-xs px-2 py-1 rounded-lg ${
+                          isEditing ? "bg-cyan-500 text-sea-900 font-bold" : "bg-white/10"
+                        }`}
+                      >
+                        {isEditing ? "Editando" : "Editar"}
+                      </button>
+                      {!isEditing ? (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteFecha(event.id)}
+                          className="text-xs text-red-300 px-2 py-1"
+                        >
+                          Borrar
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+                {isAdmin ? (
+                  <p className="text-[11px] text-slate-500">
+                    PDF · AR: {event.ar?.name || "—"} · IR: {event.ir?.name || "—"}
+                  </p>
+                ) : null}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onDownload(event.id, "ar")}
+                    className="flex-1 bg-white/10 rounded-xl py-2.5 text-xs font-bold"
+                  >
+                    AR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDownload(event.id, "ir")}
+                    className="flex-1 bg-white/10 rounded-xl py-2.5 text-xs font-bold"
+                  >
+                    IR
+                  </button>
+                </div>
+              </article>
+            );
+          })
+        ) : (
+          <Card className="text-sm text-slate-400">Todavía no hay fechas publicadas.</Card>
+        )}
+      </section>
+
       {isAdmin ? (
-        <Card className="space-y-3 border-2 border-cyan-500/40 bg-cyan-500/5 shadow-lg shadow-cyan-500/5">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">
-                {fechaIsEdit ? "Editar fecha" : "Nueva fecha"}
+        <Card
+          className={`space-y-3 ${
+            fechaIsEdit
+              ? "border-2 border-cyan-400/60 bg-cyan-500/5"
+              : "border border-white/10 border-dashed bg-sea-800/40"
+          }`}
+        >
+          {fechaIsEdit ? (
+            <div className="rounded-xl border border-cyan-400/35 bg-sea-900/50 px-3 py-3 space-y-1">
+              <p className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Actualizando</p>
+              <p className="text-lg font-bold leading-tight">{fechaForm.name.trim() || "Sin nombre"}</p>
+              <p className="text-sm text-slate-300">
+                {fechaForm.date ? formatDay(fechaForm.date) : "Elegí el día"} · {fechaForm.time || "—"} hs
               </p>
-              <h2 className="font-bold text-base mt-0.5">
-                {fechaIsEdit ? fechaForm.name || "Fecha seleccionada" : "Agregar una fecha al calendario"}
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Nombre único y un solo registro por día. Podés reemplazar AR e IR si cambian.
-              </p>
-            </div>
-            {fechaIsEdit ? (
-              <button type="button" onClick={onBeginNewFecha} className="shrink-0 text-xs font-semibold bg-cyan-500 text-sea-900 px-3 py-1.5 rounded-lg">
-                + Nueva
+              <button
+                type="button"
+                onClick={onBeginNewFecha}
+                className="mt-2 text-[11px] font-semibold text-slate-400 underline underline-offset-2"
+              >
+                Cancelar y crear otra fecha
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Nueva fecha</p>
+              <p className="text-sm text-slate-400 mt-1">Completá el formulario o tocá Editar en una fecha del calendario.</p>
+            </div>
+          )}
           <form ref={fechaFormRef} className="space-y-2.5" onSubmit={onSaveFecha}>
             <Field label="Nombre *">
               <input
@@ -144,24 +243,6 @@ export function FechasView({
                 />
               </Field>
             </div>
-            <Field label="Descartes en el neto (esta fecha)">
-              <input
-                type="number"
-                min={0}
-                max={9}
-                step={1}
-                inputMode="numeric"
-                value={fechaForm.discardsAllowed}
-                onChange={(event) =>
-                  onFechaForm({ discardsAllowed: Math.max(0, Number.parseInt(event.target.value, 10) || 0) })
-                }
-                className={controlClass}
-              />
-              <span className="mt-1 block text-[10px] text-slate-500 leading-relaxed">
-                Cuántas peores regatas restan del total (Low Point). DSQ y DNE no se descartan. Si hay 4 regatas, 1 es lo
-                habitual; en Carga podés sumar regatas después.
-              </span>
-            </Field>
             <Field label="Avisos (TOA)">
               <textarea
                 rows={3}
@@ -197,8 +278,8 @@ export function FechasView({
               <button className="flex-1 bg-cyan-500 text-sea-900 font-bold py-3 rounded-xl text-sm">
                 {fechaIsEdit ? "Guardar cambios" : "Crear fecha"}
               </button>
-              <button type="button" onClick={onResetFecha} className="px-4 bg-white/10 rounded-xl text-sm">
-                Limpiar
+              <button type="button" onClick={fechaIsEdit ? onBeginNewFecha : onResetFecha} className="px-4 bg-white/10 rounded-xl text-sm">
+                {fechaIsEdit ? "Salir" : "Limpiar"}
               </button>
             </div>
           </form>
@@ -209,57 +290,17 @@ export function FechasView({
         </Card>
       )}
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-200">
-          Calendario {events.length ? `(${events.length})` : ""}
-        </h2>
-        {events.length ? (
-          events.map((event) => (
-            <article key={event.id} className="bg-sea-800/80 rounded-2xl p-4 border border-white/10 space-y-2.5">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-bold">{event.name}</h3>
-                  <p className="text-sm text-cyan-400">
-                    {event.date ? formatDay(event.date) : "Sin día"} · {event.time || "—"} hs
-                  </p>
-                </div>
-                {isAdmin ? (
-                  <div className="flex gap-1 shrink-0">
-                    <button type="button" onClick={() => onEditFecha(event.id)} className="text-xs bg-white/10 px-2 py-1 rounded-lg">
-                      Editar
-                    </button>
-                    <button type="button" onClick={() => onDeleteFecha(event.id)} className="text-xs text-red-300 px-2 py-1">
-                      Borrar
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-              {isAdmin ? (
-                <p className="text-[11px] text-slate-500">
-                  PDF · AR: {event.ar?.name || "—"} · IR: {event.ir?.name || "—"} · Descartes neto:{" "}
-                  {effectiveDiscardsAllowed(event)}
-                </p>
-              ) : null}
-              <div className="flex gap-2">
-                <button type="button" onClick={() => onDownload(event.id, "ar")} className="flex-1 bg-white/10 rounded-xl py-2.5 text-xs font-bold">
-                  AR
-                </button>
-                <button type="button" onClick={() => onDownload(event.id, "ir")} className="flex-1 bg-white/10 rounded-xl py-2.5 text-xs font-bold">
-                  IR
-                </button>
-              </div>
-            </article>
-          ))
-        ) : (
-          <Card className="text-sm text-slate-400">Todavía no hay fechas publicadas.</Card>
-        )}
-      </section>
-
       {isAdmin ? (
-        <details className="group rounded-2xl border border-white/10 bg-sea-800/40 open:bg-sea-800/60">
+        <details
+          open={configOpen}
+          onToggle={(event) => onConfigOpenChange(event.currentTarget.open)}
+          className="group rounded-2xl border border-white/10 bg-sea-800/40 open:bg-sea-800/60"
+        >
           <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-200 [&::-webkit-details-marker]:hidden">
-            Configuración del campeonato
-            <span className="block text-[10px] font-normal text-slate-500 mt-0.5">WhatsApp oficial y clases</span>
+            Clases, categorías y WhatsApp
+            <span className="block text-[10px] font-normal text-slate-500 mt-0.5">
+              Podés cambiarlas en cualquier momento, aunque las fechas ya estén creadas
+            </span>
           </summary>
           <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-3">
             <div className="space-y-2">
@@ -286,6 +327,9 @@ export function FechasView({
                 Los timoneles eligen clase y categoría al inscribirse. Por defecto: Masculino, Femenino y General; podés
                 agregar o quitar separando con coma (ej. Master, Junior).
               </p>
+              {classIsEdit ? (
+                <p className="text-[11px] text-cyan-400 font-semibold">Editando clase: {classForm.original}</p>
+              ) : null}
               <form ref={classFormRef} className="space-y-2" onSubmit={onSaveClass}>
                 <Field label="Nombre de la clase *">
                   <input
@@ -307,7 +351,20 @@ export function FechasView({
                     Editá la lista antes de guardar. Al crear una clase nueva ya vienen las tres por defecto.
                   </span>
                 </Field>
-                <button className="w-full bg-white/10 font-bold py-2.5 rounded-xl text-sm">Guardar clase</button>
+                <div className="flex gap-2">
+                  <button type="submit" className="flex-1 bg-cyan-500 text-sea-900 font-bold py-2.5 rounded-xl text-sm">
+                    {classIsEdit ? "Guardar cambios" : "Agregar clase"}
+                  </button>
+                  {classIsEdit ? (
+                    <button
+                      type="button"
+                      onClick={onCancelClassEdit}
+                      className="px-3 bg-white/10 rounded-xl text-sm"
+                    >
+                      Cancelar
+                    </button>
+                  ) : null}
+                </div>
               </form>
               <div className="divide-y divide-white/5">
                 {classes.map((item) => (
