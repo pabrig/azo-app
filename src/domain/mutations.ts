@@ -1,4 +1,13 @@
-import { boatClasses, makeFecha, officialWhatsApp, personKey, removalMatches, sailorFechas, uid } from "./model";
+import {
+  boatClasses,
+  fechaKey,
+  makeFecha,
+  officialWhatsApp,
+  personKey,
+  removalMatches,
+  sailorFechas,
+  uid
+} from "./model";
 import type { ChampionshipState, ClassSaveInput, Fecha, FechaSaveInput, RegisterInput } from "./types";
 
 export function selectFecha(state: ChampionshipState, id: string): ChampionshipState {
@@ -113,7 +122,7 @@ export function addRace(state: ChampionshipState): ChampionshipState {
   return {
     ...state,
     events: state.events.map((event) =>
-      event.id === current.id ? { ...event, racesCount: event.racesCount + 1 } : event
+      event.id === current.id ? { ...event, racesCount: event.racesCount + 1, updatedAt: Date.now() } : event
     )
   };
 }
@@ -131,7 +140,7 @@ export function removeRace(state: ChampionshipState): ChampionshipState {
         const row = event.scores[sailorId];
         scores[sailorId] = Array.isArray(row) ? row.slice(0, racesCount) : row;
       });
-      return { ...event, racesCount, scores };
+      return { ...event, racesCount, scores, updatedAt: Date.now() };
     })
   };
 }
@@ -150,43 +159,71 @@ export function updateScore(
       if (event.id !== current.id) return event;
       const previous = event.scores[sailorId] ? [...event.scores[sailorId]] : [];
       previous[raceIdx] = value === "" ? null : value;
-      return { ...event, scores: { ...event.scores, [sailorId]: previous } };
+      return {
+        ...event,
+        scores: { ...event.scores, [sailorId]: previous },
+        scoreAt: { ...(event.scoreAt || {}), [sailorId]: Date.now() }
+      };
     })
   };
 }
 
-export function saveFecha(state: ChampionshipState, input: FechaSaveInput): ChampionshipState {
+export function saveFecha(
+  state: ChampionshipState,
+  input: FechaSaveInput
+): { state?: ChampionshipState; error?: string } {
+  const name = input.name.trim();
+  if (!name) return { error: "Falta el nombre de la fecha" };
+  if (!input.date) return { error: "Falta el día de la fecha" };
   const existing = state.events.find((event) => event.id === input.id);
+  const others = state.events.filter((event) => event.id !== existing?.id);
+  if (others.some((event) => fechaKey(event).split("|")[0] === fechaKey({ name, date: "" }).split("|")[0])) {
+    return { error: `Ya existe una fecha llamada ${name}` };
+  }
+  if (others.some((event) => event.date === input.date)) {
+    return { error: "Ya hay una fecha cargada para ese día" };
+  }
   const next = makeFecha({
     ...(existing || {}),
-    id: input.id || uid(),
-    name: input.name.trim(),
+    id: existing?.id || uid(),
+    name,
     date: input.date,
     time: input.time,
     avisos: input.avisos.trim(),
     ar: input.ar || existing?.ar,
-    ir: input.ir || existing?.ir
+    ir: input.ir || existing?.ir,
+    updatedAt: Date.now()
   });
   const events = existing
     ? state.events.map((event) =>
         event.id === next.id
-          ? { ...existing, ...next, scores: existing.scores, racesCount: existing.racesCount }
+          ? { ...existing, ...next, scores: existing.scores, scoreAt: existing.scoreAt, racesCount: existing.racesCount }
           : event
       )
     : [...state.events, next];
   events.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
-  return { ...state, events, fecha: next.id };
+  return { state: { ...state, events, fecha: next.id } };
 }
 
 export function deleteFecha(state: ChampionshipState, id: string): ChampionshipState | null {
   if (state.events.length <= 1) return null;
+  const target = state.events.find((event) => event.id === id);
+  if (!target) return null;
+  const at = Math.max(Date.now(), (target.updatedAt || 0) + 1);
   const events = state.events.filter((event) => event.id !== id);
-  const sailors = state.sailors.map((sailor) => ({
-    ...sailor,
-    fechas: sailorFechas(sailor, state.events).filter((fechaId) => fechaId !== id)
-  }));
+  const sailors = state.sailors.map((sailor) => {
+    const fechas = sailorFechas(sailor, state.events);
+    if (!fechas.includes(id)) return sailor;
+    return { ...sailor, fechas: fechas.filter((fechaId) => fechaId !== id), updatedAt: at };
+  });
   const fecha = state.fecha === id ? events[0].id : state.fecha;
-  return { ...state, events, sailors, fecha };
+  return {
+    ...state,
+    events,
+    sailors,
+    fecha,
+    removedFechas: [...state.removedFechas.filter((stamp) => stamp.id !== id), { id, at }]
+  };
 }
 
 export function saveWhatsapp(state: ChampionshipState, rawUrl: string): { state?: ChampionshipState; error?: string } {
@@ -195,7 +232,7 @@ export function saveWhatsapp(state: ChampionshipState, rawUrl: string): { state?
   if (!/chat\.whatsapp\.com/i.test(url)) {
     return { error: "Usá un link de grupo chat.whatsapp.com" };
   }
-  return { state: { ...state, whatsappUrl: url } };
+  return { state: { ...state, whatsappUrl: url, whatsappAt: Date.now() } };
 }
 
 export function saveBoatClass(
@@ -217,8 +254,9 @@ export function saveBoatClass(
     if (index >= 0) {
       list[index] = { name, categories };
       if (input.original !== name) {
+        const renamedAt = Date.now();
         sailors = sailors.map((sailor) =>
-          sailor.boatClass === input.original ? { ...sailor, boatClass: name } : sailor
+          sailor.boatClass === input.original ? { ...sailor, boatClass: name, updatedAt: renamedAt } : sailor
         );
         if (classFilter === input.original) classFilter = name;
       }
@@ -228,7 +266,7 @@ export function saveBoatClass(
   } else {
     list.push({ name, categories });
   }
-  return { state: { ...state, classes: list, sailors, classFilter } };
+  return { state: { ...state, classes: list, sailors, classFilter, classesAt: Date.now() } };
 }
 
 export function deleteBoatClass(state: ChampionshipState, name: string): ChampionshipState | null {
@@ -237,7 +275,8 @@ export function deleteBoatClass(state: ChampionshipState, name: string): Champio
   return {
     ...state,
     classes: source.filter((item) => item.name !== name),
-    classFilter: state.classFilter === name ? "ALL" : state.classFilter
+    classFilter: state.classFilter === name ? "ALL" : state.classFilter,
+    classesAt: Date.now()
   };
 }
 
@@ -249,6 +288,9 @@ export function storedSnapshot(state: ChampionshipState) {
     events: state.events,
     whatsappUrl: officialWhatsApp(state),
     classes: boatClasses(state),
-    removedSailors: state.removedSailors
+    removedSailors: state.removedSailors,
+    removedFechas: state.removedFechas,
+    whatsappAt: state.whatsappAt,
+    classesAt: state.classesAt
   };
 }

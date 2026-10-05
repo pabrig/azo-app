@@ -18,6 +18,13 @@ export type Fecha = {
   ir: RaceDoc;
   racesCount: number;
   scores: Record<string, Array<string | null>>;
+  updatedAt?: number;
+  scoreAt?: Record<string, number>;
+};
+
+export type RemovedFecha = {
+  id: string;
+  at: number;
 };
 
 export type BoatClass = {
@@ -51,6 +58,9 @@ export type ChampionshipState = {
   whatsappUrl: string;
   classes: BoatClass[];
   removedSailors: RemovedSailor[];
+  removedFechas: RemovedFecha[];
+  whatsappAt: number;
+  classesAt: number;
 };
 
 export type SyncMode = "live" | "error" | "local";
