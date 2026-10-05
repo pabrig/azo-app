@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { cloudPayload, cloudView, mergeClassesMeta, mergeRemote, syncFingerprint } from "./cloud";
 import { defaultState, migrateClasses, migrateEvents } from "./model";
 import { dateNet, fleetSize, pointsFor, rankedForFecha } from "./scoring";
-import { deleteBoatClass, deleteFecha, registerSailor, removeSailor, saveFecha, updateScore } from "./mutations";
+import {
+  deleteBoatClass,
+  deleteFecha,
+  registerSailor,
+  removeSailor,
+  saveBoatClass,
+  saveFecha,
+  updateScore
+} from "./mutations";
 import type { ChampionshipState, Sailor } from "./types";
 
 describe("puntaje low point", () => {
@@ -69,8 +77,8 @@ describe("puntaje low point", () => {
 describe("fechas y clases heredadas", () => {
   it("migra clases que estaban guardadas como texto", () => {
     const classes = migrateClasses(["ILCA 6", "Optimist"]);
-    expect(classes[0].categories).toContain("Junior");
-    expect(classes[1]).toEqual({ name: "Optimist", categories: ["General"] });
+    expect(classes[0].categories).toEqual(["Masculino", "Femenino", "General"]);
+    expect(classes[1]).toEqual({ name: "Optimist", categories: ["Masculino", "Femenino", "General"] });
   });
 
   it("migra el mapa viejo de fechas", () => {
@@ -107,6 +115,36 @@ describe("fechas y clases heredadas", () => {
     state = deleteBoatClass(state, "Pampero")!;
     expect(state.sailors[0].boatClass).not.toBe("Pampero");
     expect(state.classes.some((item) => item.name === "Pampero")).toBe(false);
+  });
+
+  it("migra clases creadas con categorías viejas al trío Masculino / Femenino / General", () => {
+    const classes = migrateClasses([
+      { name: "Catamarán", categories: ["General"] },
+      { name: "ILCA 6", categories: ["General", "Junior", "Femenino"] }
+    ]);
+    expect(classes.find((item) => item.name === "Catamarán")?.categories).toEqual([
+      "Masculino",
+      "Femenino",
+      "General"
+    ]);
+    expect(classes.find((item) => item.name === "ILCA 6")?.categories).toEqual([
+      "Masculino",
+      "Femenino",
+      "General",
+      "Junior"
+    ]);
+  });
+
+  it("guarda categorías personalizadas al crear una clase", () => {
+    const state = defaultState();
+    const result = saveBoatClass(state, {
+      name: "Optimist",
+      original: "",
+      categories: ["Masculino", "Femenino", "General", "Cadete", "Cadete"]
+    });
+    expect(result.error).toBeUndefined();
+    const saved = result.state!.classes.find((item) => item.name === "Optimist");
+    expect(saved?.categories).toEqual(["Masculino", "Femenino", "General", "Cadete"]);
   });
 
   it("mergeClassesMeta respeta el timestamp más reciente", () => {

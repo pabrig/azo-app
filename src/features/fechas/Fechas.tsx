@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useChampionship } from "../../app/championship-context";
 import { downloadDoc } from "../../data/download-doc";
 import { readFileAsDataUrl } from "../../data/read-file";
-import { DEFAULT_AVISOS } from "../../domain/defaults";
+import { DEFAULT_AVISOS, DEFAULT_CLASS_CATEGORIES } from "../../domain/defaults";
 import { boatClasses, officialWhatsApp, suggestNextFechaName } from "../../domain/model";
 import { FechasView, type ClassFormState, type FechaFormState } from "./Fechas.view";
 
@@ -14,7 +14,11 @@ const emptyFecha = (): FechaFormState => ({
   avisos: DEFAULT_AVISOS
 });
 
-const emptyClass = (): ClassFormState => ({ original: "", name: "", categories: "" });
+const emptyClass = (): ClassFormState => ({
+  original: "",
+  name: "",
+  categories: DEFAULT_CLASS_CATEGORIES.join(", ")
+});
 
 function docHint(name?: string) {
   return name

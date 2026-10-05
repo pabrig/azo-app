@@ -64,7 +64,7 @@ export function ClassChips({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex gap-1.5 overflow-x-auto">
+    <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-0.5 px-0.5">
       {["ALL", ...names].map((name) => {
         const selected = value === name;
         return (
@@ -72,7 +72,7 @@ export function ClassChips({
             key={name}
             type="button"
             onClick={() => onChange(name)}
-            className={`whitespace-nowrap px-2.5 py-1 rounded-lg text-[10px] font-bold ${selected ? "bg-cyan-500 text-sea-900" : "bg-white/10 text-slate-300"}`}
+            className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[11px] font-bold shrink-0 ${selected ? "bg-cyan-500 text-sea-900" : "bg-white/10 text-slate-300"}`}
           >
             {name === "ALL" ? "Todas" : name}
           </button>

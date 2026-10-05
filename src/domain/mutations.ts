@@ -1,3 +1,4 @@
+import { normalizeClassCategories } from "./defaults";
 import {
   boatClasses,
   fechaKey,
@@ -242,7 +243,7 @@ export function saveBoatClass(
 ): { state?: ChampionshipState; error?: string } {
   const name = input.name.trim();
   if (!name) return { error: "Falta el nombre de la clase" };
-  const categories = input.categories.length ? input.categories : ["General"];
+  const categories = normalizeClassCategories(input.categories);
   const list = boatClasses(state).map((item) => ({ ...item, categories: item.categories.slice() }));
   const duplicate = list.find(
     (item) => item.name.toLowerCase() === name.toLowerCase() && item.name !== input.original

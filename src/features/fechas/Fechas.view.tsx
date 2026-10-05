@@ -261,7 +261,10 @@ export function FechasView({
             </div>
             <div className="space-y-2">
               <h3 className="text-sm font-bold">Clases</h3>
-              <p className="text-xs text-slate-400">Los timoneles eligen estas clases al inscribirse. Categorías separadas por coma.</p>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Los timoneles eligen clase y categoría al inscribirse. Por defecto: Masculino, Femenino y General; podés
+                agregar o quitar separando con coma (ej. Master, Junior).
+              </p>
               <form ref={classFormRef} className="space-y-2" onSubmit={onSaveClass}>
                 <Field label="Nombre de la clase *">
                   <input
@@ -272,13 +275,16 @@ export function FechasView({
                     className={controlClass}
                   />
                 </Field>
-                <Field label="Categorías">
+                <Field label="Categorías de la clase">
                   <input
-                    placeholder="General, Junior, Master"
+                    placeholder="Masculino, Femenino, General"
                     value={classForm.categories}
                     onChange={(event) => onClassForm({ categories: event.target.value })}
                     className={controlClass}
                   />
+                  <span className="mt-1 block text-[10px] text-slate-500">
+                    Editá la lista antes de guardar. Al crear una clase nueva ya vienen las tres por defecto.
+                  </span>
                 </Field>
                 <button className="w-full bg-white/10 font-bold py-2.5 rounded-xl text-sm">Guardar clase</button>
               </form>

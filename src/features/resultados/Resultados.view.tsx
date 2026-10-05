@@ -33,10 +33,10 @@ export function ResultadosView({
   note?: ReactNode;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <ComprobanteToolbar cardRef={cardRef} filename={pngFilename} onToast={onToast} />
       <ClassChips names={classNames} value={classFilter} onChange={onClassFilter} />
-      {note}
+      {note ? <div className="text-[11px] leading-relaxed">{note}</div> : null}
       <ResultsCard
         cardRef={cardRef}
         title={title}

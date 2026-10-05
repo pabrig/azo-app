@@ -1,26 +1,52 @@
 import type { BoatClass, RaceDoc } from "./types";
 
+/** Categorías sugeridas al crear una clase (la comisión puede agregar más). */
+export const DEFAULT_CLASS_CATEGORIES = ["Masculino", "Femenino", "General"] as const;
+
 export const DEFAULT_BOAT_CLASSES: BoatClass[] = [
-  {
-    name: "ILCA 7",
-    categories: ["General", "Apprentice", "Master", "Grand Master", "Great Grand Master"]
-  },
-  {
-    name: "ILCA 6",
-    categories: [
-      "General",
-      "Junior",
-      "Apprentice",
-      "Master",
-      "Grand Master",
-      "Great Grand Master",
-      "Femenino"
-    ]
-  },
-  { name: "ILCA 4", categories: ["General", "Junior", "Cadete", "Femenino"] },
-  { name: "Pampero", categories: ["General", "Mixto", "Femenino", "Promocional"] },
-  { name: "Otras", categories: ["General", "Libre"] }
+  { name: "ILCA 7", categories: [...DEFAULT_CLASS_CATEGORIES] },
+  { name: "ILCA 6", categories: [...DEFAULT_CLASS_CATEGORIES] },
+  { name: "ILCA 4", categories: [...DEFAULT_CLASS_CATEGORIES] },
+  { name: "Pampero", categories: [...DEFAULT_CLASS_CATEGORIES] },
+  { name: "Otras", categories: [...DEFAULT_CLASS_CATEGORIES] }
 ];
+
+export function normalizeClassCategories(raw: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const source = raw.length ? raw : [...DEFAULT_CLASS_CATEGORIES];
+  for (const item of source) {
+    const label = item.trim();
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out.length ? out : [...DEFAULT_CLASS_CATEGORIES];
+}
+
+function hasCategory(categories: string[], label: string) {
+  const key = label.toLowerCase();
+  return categories.some((item) => item.toLowerCase() === key);
+}
+
+/** Clases guardadas antes del esquema Masculino / Femenino / General. */
+export function isLegacyClassCategories(categories: string[]): boolean {
+  if (!categories.length) return true;
+  return (
+    !hasCategory(categories, "Masculino") ||
+    !hasCategory(categories, "Femenino") ||
+    !hasCategory(categories, "General")
+  );
+}
+
+/** Al cargar o sincronizar: suma el trío nuevo sin borrar categorías extra (Master, Cadete…). */
+export function migrateClassCategories(categories: string[]): string[] {
+  const normalized = normalizeClassCategories(categories);
+  if (!isLegacyClassCategories(normalized)) return normalized;
+  return normalizeClassCategories([...DEFAULT_CLASS_CATEGORIES, ...normalized]);
+}
 
 export const DEFAULT_AR: RaceDoc = {
   name: "AR_VELA_LIGERA.pdf",

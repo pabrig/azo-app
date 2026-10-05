@@ -1,4 +1,11 @@
-import { bundledDoc, defaultBoatClasses, DEFAULT_AVISOS, DEFAULT_WHATSAPP } from "./defaults";
+import {
+  bundledDoc,
+  DEFAULT_CLASS_CATEGORIES,
+  defaultBoatClasses,
+  DEFAULT_AVISOS,
+  DEFAULT_WHATSAPP,
+  migrateClassCategories
+} from "./defaults";
 import type { BoatClass, ChampionshipState, Fecha, RemovedFecha, Sailor } from "./types";
 
 export function uid() {
@@ -63,16 +70,19 @@ export function migrateClasses(raw: unknown): BoatClass[] {
     .map((item) => {
       if (typeof item === "string") {
         const known = DEFAULT_BOAT_CLASSES_LOOKUP(item);
-        return { name: item, categories: known ? known.slice() : ["General"] };
+        return {
+          name: item,
+          categories: migrateClassCategories(known ? known.slice() : [...DEFAULT_CLASS_CATEGORIES])
+        };
       }
-      if (!item || typeof item !== "object") return { name: "", categories: ["General"] };
+      if (!item || typeof item !== "object") return { name: "", categories: [...DEFAULT_CLASS_CATEGORIES] };
       const record = item as { name?: unknown; categories?: unknown };
       const categories = Array.isArray(record.categories)
         ? record.categories.map((value) => String(value).trim()).filter(Boolean)
         : [];
       return {
         name: String(record.name || "").trim(),
-        categories: categories.length ? categories : ["General"]
+        categories: migrateClassCategories(categories)
       };
     })
     .filter((item) => item.name);
@@ -230,7 +240,7 @@ export function officialWhatsApp(state: ChampionshipState) {
 
 export function categoriesForClass(state: ChampionshipState, className: string) {
   const found = boatClasses(state).find((item) => item.name === className);
-  return found?.categories.length ? found.categories : ["General"];
+  return found?.categories.length ? found.categories : [...DEFAULT_CLASS_CATEGORIES];
 }
 
 export function preferredClassName(state: ChampionshipState) {

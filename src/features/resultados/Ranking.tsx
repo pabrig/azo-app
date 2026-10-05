@@ -33,9 +33,9 @@ export function Ranking() {
       onToast={api.showToast}
       pngFilename="Ranking_General_CNA.png"
       note={
-        <p className="text-[11px] text-slate-400 px-1">
+        <p className="text-slate-500">
           Suma de puntos netos de todas las fechas (menor puntaje gana). Descarte del peor resultado si una fecha tiene 4
-          o más regatas. El campeonato prevé un descarte según el AR.
+          o más regatas.
         </p>
       }
     />
