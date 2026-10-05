@@ -15,6 +15,7 @@ export type UnwrappedEvents = {
   events: Fecha[];
   whatsappUrl: string | null;
   classes: unknown;
+  classesAt: number;
   removedSailors: RemovedSailor[];
 };
 
@@ -23,6 +24,7 @@ export type ParsedCloud = {
   events: Fecha[];
   whatsappUrl: string | null;
   classes: BoatClass[] | null;
+  classesAt: number;
   removedSailors: RemovedSailor[];
 };
 
@@ -33,11 +35,13 @@ export function wrapEventsForCloud(state: ChampionshipState) {
     fechas: Fecha[];
     whatsappUrl: string;
     classes: BoatClass[];
+    classesAt: number;
     removedSailors?: RemovedSailor[];
   } = {
     fechas: canonicalEvents(state.events),
     whatsappUrl: officialWhatsApp(state),
-    classes: [...boatClasses(state)].sort((a, b) => a.name.localeCompare(b.name))
+    classes: [...boatClasses(state)].sort((a, b) => a.name.localeCompare(b.name)),
+    classesAt: state.classesAt || 0
   };
   const removedSailors = canonicalRemoved(state.removedSailors);
   if (removedSailors.length) payload.removedSailors = removedSailors;
@@ -49,6 +53,7 @@ export function unwrapEvents(raw: unknown): UnwrappedEvents {
     events: seedEvents(),
     whatsappUrl: DEFAULT_WHATSAPP,
     classes: null,
+    classesAt: 0,
     removedSailors: []
   };
   if (!raw) return empty;
@@ -61,27 +66,30 @@ export function unwrapEvents(raw: unknown): UnwrappedEvents {
     }
   }
   if (Array.isArray(value)) {
-    return { events: migrateEvents(value), whatsappUrl: null, classes: null, removedSailors: [] };
+    return { events: migrateEvents(value), whatsappUrl: null, classes: null, classesAt: 0, removedSailors: [] };
   }
   if (value && typeof value === "object" && "fechas" in value) {
     const record = value as {
       fechas?: unknown;
       whatsappUrl?: string;
       classes?: unknown;
+      classesAt?: unknown;
       removedSailors?: unknown;
     };
     return {
       events: migrateEvents(record.fechas),
       whatsappUrl: record.whatsappUrl || null,
       classes: record.classes || null,
+      classesAt: typeof record.classesAt === "number" ? record.classesAt : 0,
       removedSailors: parseRemoved(record.removedSailors)
     };
   }
-  const record = value as { whatsappUrl?: string; classes?: unknown; removedSailors?: unknown };
+  const record = value as { whatsappUrl?: string; classes?: unknown; classesAt?: unknown; removedSailors?: unknown };
   return {
     events: migrateEvents(value),
     whatsappUrl: record.whatsappUrl || null,
     classes: record.classes || null,
+    classesAt: typeof record.classesAt === "number" ? record.classesAt : 0,
     removedSailors: parseRemoved(record.removedSailors)
   };
 }
@@ -101,6 +109,7 @@ export function parseCloudDoc(doc: CloudRow | null | undefined): ParsedCloud {
       events: seedEvents(),
       whatsappUrl: DEFAULT_WHATSAPP,
       classes: defaultBoatClasses(),
+      classesAt: 0,
       removedSailors: []
     };
   }
@@ -111,6 +120,7 @@ export function parseCloudDoc(doc: CloudRow | null | undefined): ParsedCloud {
     events: unwrapped.events,
     whatsappUrl: unwrapped.whatsappUrl,
     classes: unwrapped.classes ? migrateClasses(unwrapped.classes) : null,
+    classesAt: unwrapped.classesAt,
     removedSailors: unwrapped.removedSailors
   };
 }
@@ -125,6 +135,7 @@ export function cloudView(row: unknown): ChampionshipState {
     whatsappUrl: parsed.whatsappUrl || DEFAULT_WHATSAPP,
     classes: parsed.classes && parsed.classes.length ? parsed.classes : defaultBoatClasses(),
     removedSailors: parsed.removedSailors,
+    classesAt: parsed.classesAt,
     fecha: events[0]?.id || ""
   };
 }
@@ -151,7 +162,7 @@ export function mergeRemote(state: ChampionshipState, row: unknown): Championshi
     removedSailors,
     events,
     whatsappUrl: parsed.whatsappUrl || state.whatsappUrl,
-    classes: mergeClasses(state.classes, parsed.classes),
+    ...mergeClassesMeta(state.classes, state.classesAt || 0, parsed.classes, parsed.classesAt || 0),
     fecha
   };
 }
@@ -372,10 +383,29 @@ function mergeEvents(local: Fecha[], remote: Fecha[], idMap: Map<string, string>
   return canonicalEvents([...map.values()]);
 }
 
-function mergeClasses(local: BoatClass[], remote: BoatClass[] | null) {
-  if (!remote?.length) return local.length ? local : defaultBoatClasses();
+/** La lista de clases completa gana por `classesAt`; no se re-unen borrados desde la nube. */
+export function mergeClassesMeta(
+  local: BoatClass[],
+  localAt: number,
+  remote: BoatClass[] | null,
+  remoteAt: number
+): { classes: BoatClass[]; classesAt: number } {
+  const localList = local.length ? local : defaultBoatClasses();
+  if (!remote?.length) {
+    return { classes: localList, classesAt: Math.max(localAt, remoteAt) };
+  }
+  const remoteList = migrateClasses(remote);
+  if (localAt > remoteAt) {
+    return { classes: local.length ? local : defaultBoatClasses(), classesAt: localAt };
+  }
+  if (remoteAt > localAt) {
+    return { classes: remoteList, classesAt: remoteAt };
+  }
   const map = new Map<string, BoatClass>();
-  for (const item of local) map.set(item.name, item);
-  for (const item of remote) map.set(item.name, item);
-  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  for (const item of localList) map.set(item.name, item);
+  for (const item of remoteList) map.set(item.name, item);
+  return {
+    classes: [...map.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    classesAt: Math.max(localAt, remoteAt)
+  };
 }

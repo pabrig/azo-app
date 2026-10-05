@@ -270,13 +270,21 @@ export function saveBoatClass(
 }
 
 export function deleteBoatClass(state: ChampionshipState, name: string): ChampionshipState | null {
-  const source = boatClasses(state);
+  const source = state.classes.length ? state.classes.map((item) => ({ ...item, categories: item.categories.slice() })) : boatClasses(state);
   if (source.length <= 1) return null;
+  if (!source.some((item) => item.name === name)) return null;
+  const nextClasses = source.filter((item) => item.name !== name);
+  const fallbackClass = nextClasses[0]?.name || "General";
+  const at = Date.now();
+  const sailors = state.sailors.map((sailor) =>
+    sailor.boatClass === name ? { ...sailor, boatClass: fallbackClass, updatedAt: at } : sailor
+  );
   return {
     ...state,
-    classes: source.filter((item) => item.name !== name),
+    classes: nextClasses,
+    sailors,
     classFilter: state.classFilter === name ? "ALL" : state.classFilter,
-    classesAt: Date.now()
+    classesAt: at
   };
 }
 

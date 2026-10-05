@@ -114,9 +114,11 @@ export function Fechas() {
         }
         const used = api.state.sailors.filter((sailor) => sailor.boatClass === name).length;
         const accepted = used
-          ? window.confirm(`Hay ${used} inscripto(s) en ${name}. ¿Borrar la clase igual?`)
+          ? window.confirm(
+              `Hay ${used} inscripto(s) en ${name}. Si borrás la clase, pasan a la primera clase restante (no depende de fechas). ¿Continuar?`
+            )
           : window.confirm(`¿Borrar la clase ${name}?`);
-        if (accepted) api.deleteBoatClass(name);
+        if (accepted && !api.deleteBoatClass(name)) return;
       }}
       fechaForm={fechaForm}
       fechaFormRef={fechaFormRef}

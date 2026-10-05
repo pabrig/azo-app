@@ -3,7 +3,7 @@ import { config } from "../config";
 import { createCloudSync, type CloudSync } from "../data/appwrite-sync";
 import { loadLocalState, persistLocal, readAdminSession, writeAdminSession } from "../data/local-store";
 import { mergeRemote } from "../domain/cloud";
-import { currentEvent } from "../domain/model";
+import { boatClasses, currentEvent } from "../domain/model";
 import {
   addRace,
   deleteBoatClass,
@@ -202,9 +202,18 @@ export function ChampionshipProvider({ children }: { children: ReactNode }) {
       },
       deleteBoatClass(name: string) {
         if (!isAdmin) return false;
-        const next = deleteBoatClass(stateRef.current, name);
-        if (!next) {
+        const current = stateRef.current;
+        if (boatClasses(current).length <= 1) {
           showToast("Debe quedar al menos una clase");
+          return false;
+        }
+        if (!boatClasses(current).some((item) => item.name === name)) {
+          showToast("No encontramos esa clase");
+          return false;
+        }
+        const next = deleteBoatClass(current, name);
+        if (!next) {
+          showToast("No se pudo borrar la clase");
           return false;
         }
         commit(next);

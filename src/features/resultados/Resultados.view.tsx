@@ -1,6 +1,7 @@
 import type { ReactNode, RefObject } from "react";
 import { ClassChips } from "../../ui/primitives";
 import { ResultsCard, type ResultRow } from "../../ui/ResultsCard";
+import { ComprobanteToolbar } from "./ComprobanteToolbar";
 
 export function ResultadosView({
   cardRef,
@@ -13,7 +14,8 @@ export function ResultadosView({
   classNames,
   classFilter,
   onClassFilter,
-  onShare,
+  onToast,
+  pngFilename,
   note
 }: {
   cardRef: RefObject<HTMLDivElement | null>;
@@ -26,14 +28,13 @@ export function ResultadosView({
   classNames: string[];
   classFilter: string;
   onClassFilter: (value: string) => void;
-  onShare: () => void;
+  onToast: (message: string) => void;
+  pngFilename: string;
   note?: ReactNode;
 }) {
   return (
     <div className="space-y-3">
-      <button type="button" onClick={onShare} className="w-full bg-cyan-500 text-sea-900 font-bold text-xs py-2.5 rounded-xl">
-        Compartir captura PNG
-      </button>
+      <ComprobanteToolbar cardRef={cardRef} filename={pngFilename} onToast={onToast} />
       <ClassChips names={classNames} value={classFilter} onChange={onClassFilter} />
       {note}
       <ResultsCard
