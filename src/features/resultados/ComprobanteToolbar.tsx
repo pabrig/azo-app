@@ -70,12 +70,13 @@ export function ComprobanteToolbar({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="comprobante-toolbar space-y-3">
+      <p className="hidden lg:block text-[11px] font-semibold text-slate-300">Comprobante PNG</p>
       <button
         type="button"
         disabled={busy}
         onClick={() => void generate()}
-        className="w-full bg-cyan-500 text-sea-900 font-bold text-sm py-3 rounded-xl disabled:opacity-60"
+        className="w-full bg-cyan-500 text-sea-900 font-bold text-sm lg:text-[13px] py-3 lg:py-2.5 rounded-xl disabled:opacity-60"
       >
         {preview ? "Regenerar comprobante PNG" : "Generar comprobante PNG"}
       </button>

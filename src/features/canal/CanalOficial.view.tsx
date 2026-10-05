@@ -8,7 +8,7 @@ export function CanalOficialView({
   onEdit: () => void;
 }) {
   return (
-    <section className="rounded-2xl border border-emerald-500/25 bg-sea-800 px-3 py-2.5">
+    <section className="rounded-2xl border border-emerald-500/25 bg-sea-800 px-3 py-2.5 lg:px-4 lg:py-3">
       <div className="flex items-center gap-2.5">
         <span
           className="shrink-0 w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center"

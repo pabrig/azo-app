@@ -33,19 +33,32 @@ export function ResultadosView({
   note?: ReactNode;
 }) {
   return (
-    <div className="space-y-2.5">
-      <ComprobanteToolbar cardRef={cardRef} filename={pngFilename} onToast={onToast} />
-      <ClassChips names={classNames} value={classFilter} onChange={onClassFilter} />
-      {note ? <div className="text-[11px] leading-relaxed">{note}</div> : null}
-      <ResultsCard
-        cardRef={cardRef}
-        title={title}
-        classLabel={classLabel}
-        year={year}
-        stamp={stamp}
-        columns={columns}
-        rows={rows}
-      />
+    <div className="results-layout">
+      <div className="results-layout__filters">
+        <ClassChips title="Resultados" names={classNames} value={classFilter} onChange={onClassFilter} />
+      </div>
+
+      <div className="results-layout__body">
+        <div className="results-layout__main min-w-0">
+          <ResultsCard
+            cardRef={cardRef}
+            title={title}
+            classLabel={classLabel}
+            year={year}
+            stamp={stamp}
+            columns={columns}
+            rows={rows}
+          />
+          <div className="lg:hidden">
+            <ComprobanteToolbar cardRef={cardRef} filename={pngFilename} onToast={onToast} />
+          </div>
+          {note ? <div className="results-layout__note">{note}</div> : null}
+        </div>
+
+        <aside className="results-layout__rail hidden lg:block">
+          <ComprobanteToolbar cardRef={cardRef} filename={pngFilename} onToast={onToast} />
+        </aside>
+      </div>
     </div>
   );
 }

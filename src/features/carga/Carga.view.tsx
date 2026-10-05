@@ -77,8 +77,14 @@ export function CargaView({
           </button>
         </div>
       </div>
-      <ClassChips names={classNames} value={classFilter} onChange={onClassFilter} />
-      <p className="text-[10px] text-slate-500 leading-relaxed">Puesto o código: DNC, DNS, OCS, DNF, DSQ, DNE.</p>
+      <div className="carga-layout">
+        <div className="carga-layout__filters">
+          <ClassChips title="Clases" names={classNames} value={classFilter} onChange={onClassFilter} />
+        </div>
+        <p className="carga-layout__hint text-[10px] lg:text-xs text-slate-500 leading-relaxed">
+          Puesto o código: DNC, DNS, OCS, DNF, DSQ, DNE.
+        </p>
+        <div className="carga-layout__table min-w-0">
       {hasEvent ? (
         <div className="data-scroll data-scroll--entry rounded-xl border border-white/10 -mx-0.5">
           <table className="w-full min-w-[16rem] text-left border-collapse">
@@ -139,6 +145,8 @@ export function CargaView({
           </table>
         </div>
       ) : null}
+        </div>
+      </div>
     </Card>
   );
 }

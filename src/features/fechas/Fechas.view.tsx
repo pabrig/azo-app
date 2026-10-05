@@ -74,16 +74,16 @@ export function FechasView({
   onDownload: (id: string, kind: "ar" | "ir") => void;
 }) {
   return (
-    <div className="space-y-4">
-      <header className="space-y-1">
-        <h1 className="text-lg font-bold tracking-tight">Fechas del campeonato</h1>
-        <p className="text-xs text-slate-400 leading-relaxed">
+    <div className="fechas-layout space-y-4 lg:space-y-5">
+      <header className="space-y-1 lg:col-span-2">
+        <h1 className="text-lg lg:text-xl font-bold tracking-tight">Fechas del campeonato</h1>
+        <p className="text-xs lg:text-sm text-slate-400 leading-relaxed max-w-2xl">
           Día, hora, avisos y documentos AR/IR. Los timoneles descargan los PDF desde acá.
         </p>
       </header>
 
       {classes.length ? (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="fechas-class-tags flex flex-wrap gap-1.5">
           {classes.map((item) => (
             <span key={item.name} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/10 text-slate-200">
               {item.name}

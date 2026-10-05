@@ -46,8 +46,8 @@ export function InscripcionView({
   }, [sailors.length]);
 
   return (
-    <div className="space-y-3">
-      <Card className="space-y-2 text-sm">
+    <div className="inscripcion-layout space-y-3 lg:space-y-0 lg:gap-5">
+      <Card className="space-y-2 text-sm lg:sticky lg:top-3 lg:self-start">
         {brief ? (
           <>
             <div>
@@ -71,7 +71,8 @@ export function InscripcionView({
         )}
       </Card>
 
-      <form onSubmit={onSubmit} className="bg-sea-800 rounded-2xl p-4 border border-white/10 space-y-3 shadow-lg">
+      <div className="inscripcion-layout-main space-y-3 min-w-0">
+      <form onSubmit={onSubmit} className="bg-sea-800 rounded-2xl p-4 lg:p-5 border border-white/10 space-y-3 shadow-lg">
         <div className="flex items-center justify-between">
           <h2 className="font-bold">Inscripción</h2>
           <span className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Timonel</span>
@@ -190,6 +191,7 @@ export function InscripcionView({
           )}
         </div>
       </Card>
+      </div>
     </div>
   );
 }
