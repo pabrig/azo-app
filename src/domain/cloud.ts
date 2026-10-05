@@ -1,6 +1,8 @@
 import { defaultBoatClasses, DEFAULT_WHATSAPP } from "./defaults";
 import {
+  applyRemovedFechas,
   boatClasses,
+  compactDuplicateFechas,
   defaultState,
   migrateClasses,
   migrateEvents,
@@ -9,7 +11,7 @@ import {
   sailorKey,
   seedEvents
 } from "./model";
-import type { BoatClass, ChampionshipState, Fecha, RemovedSailor, Sailor } from "./types";
+import type { BoatClass, ChampionshipState, Fecha, RemovedFecha, RemovedSailor, Sailor } from "./types";
 
 export type UnwrappedEvents = {
   events: Fecha[];
@@ -17,6 +19,7 @@ export type UnwrappedEvents = {
   classes: unknown;
   classesAt: number;
   removedSailors: RemovedSailor[];
+  removedFechas: RemovedFecha[];
 };
 
 export type ParsedCloud = {
@@ -26,6 +29,7 @@ export type ParsedCloud = {
   classes: BoatClass[] | null;
   classesAt: number;
   removedSailors: RemovedSailor[];
+  removedFechas: RemovedFecha[];
 };
 
 type CloudRow = { sailors?: unknown; events?: unknown; data?: unknown };
@@ -37,6 +41,7 @@ export function wrapEventsForCloud(state: ChampionshipState) {
     classes: BoatClass[];
     classesAt: number;
     removedSailors?: RemovedSailor[];
+    removedFechas?: RemovedFecha[];
   } = {
     fechas: canonicalEvents(state.events),
     whatsappUrl: officialWhatsApp(state),
@@ -45,6 +50,8 @@ export function wrapEventsForCloud(state: ChampionshipState) {
   };
   const removedSailors = canonicalRemoved(state.removedSailors);
   if (removedSailors.length) payload.removedSailors = removedSailors;
+  const removedFechas = canonicalRemovedFechas(state.removedFechas);
+  if (removedFechas.length) payload.removedFechas = removedFechas;
   return JSON.stringify(payload);
 }
 
@@ -54,7 +61,8 @@ export function unwrapEvents(raw: unknown): UnwrappedEvents {
     whatsappUrl: DEFAULT_WHATSAPP,
     classes: null,
     classesAt: 0,
-    removedSailors: []
+    removedSailors: [],
+    removedFechas: []
   };
   if (!raw) return empty;
   let value = raw;
@@ -66,7 +74,14 @@ export function unwrapEvents(raw: unknown): UnwrappedEvents {
     }
   }
   if (Array.isArray(value)) {
-    return { events: migrateEvents(value), whatsappUrl: null, classes: null, classesAt: 0, removedSailors: [] };
+    return {
+      events: migrateEvents(value),
+      whatsappUrl: null,
+      classes: null,
+      classesAt: 0,
+      removedSailors: [],
+      removedFechas: []
+    };
   }
   if (value && typeof value === "object" && "fechas" in value) {
     const record = value as {
@@ -75,22 +90,31 @@ export function unwrapEvents(raw: unknown): UnwrappedEvents {
       classes?: unknown;
       classesAt?: unknown;
       removedSailors?: unknown;
+      removedFechas?: unknown;
     };
     return {
       events: migrateEvents(record.fechas),
       whatsappUrl: record.whatsappUrl || null,
       classes: record.classes || null,
       classesAt: typeof record.classesAt === "number" ? record.classesAt : 0,
-      removedSailors: parseRemoved(record.removedSailors)
+      removedSailors: parseRemoved(record.removedSailors),
+      removedFechas: parseRemovedFechas(record.removedFechas)
     };
   }
-  const record = value as { whatsappUrl?: string; classes?: unknown; classesAt?: unknown; removedSailors?: unknown };
+  const record = value as {
+    whatsappUrl?: string;
+    classes?: unknown;
+    classesAt?: unknown;
+    removedSailors?: unknown;
+    removedFechas?: unknown;
+  };
   return {
     events: migrateEvents(value),
     whatsappUrl: record.whatsappUrl || null,
     classes: record.classes || null,
     classesAt: typeof record.classesAt === "number" ? record.classesAt : 0,
-    removedSailors: parseRemoved(record.removedSailors)
+    removedSailors: parseRemoved(record.removedSailors),
+    removedFechas: parseRemovedFechas(record.removedFechas)
   };
 }
 
@@ -110,18 +134,22 @@ export function parseCloudDoc(doc: CloudRow | null | undefined): ParsedCloud {
       whatsappUrl: DEFAULT_WHATSAPP,
       classes: defaultBoatClasses(),
       classesAt: 0,
-      removedSailors: []
+      removedSailors: [],
+      removedFechas: []
     };
   }
   const sailors = typeof row.sailors === "string" ? JSON.parse(row.sailors || "[]") : row.sailors || [];
   const unwrapped = unwrapEvents(row.events);
+  const removedFechas = mergeRemovedFechas([], unwrapped.removedFechas);
+  const events = finalizeEvents(unwrapped.events.length ? unwrapped.events : seedEvents(), removedFechas);
   return {
     sailors: Array.isArray(sailors) ? sailors : [],
-    events: unwrapped.events,
+    events,
     whatsappUrl: unwrapped.whatsappUrl,
     classes: unwrapped.classes ? migrateClasses(unwrapped.classes) : null,
     classesAt: unwrapped.classesAt,
-    removedSailors: unwrapped.removedSailors
+    removedSailors: unwrapped.removedSailors,
+    removedFechas
   };
 }
 
@@ -135,6 +163,7 @@ export function cloudView(row: unknown): ChampionshipState {
     whatsappUrl: parsed.whatsappUrl || DEFAULT_WHATSAPP,
     classes: parsed.classes && parsed.classes.length ? parsed.classes : defaultBoatClasses(),
     removedSailors: parsed.removedSailors,
+    removedFechas: parsed.removedFechas,
     classesAt: parsed.classesAt,
     fecha: events[0]?.id || ""
   };
@@ -154,12 +183,14 @@ export function mergeRemote(state: ChampionshipState, row: unknown): Championshi
     state.removedSailors,
     parsed.removedSailors
   );
-  const events = mergeEvents(state.events, parsed.events, idMap);
+  const removedFechas = mergeRemovedFechas(state.removedFechas, parsed.removedFechas);
+  const events = mergeEvents(state.events, parsed.events, idMap, removedFechas);
   const fecha = events.some((event) => event.id === state.fecha) ? state.fecha : events[0]?.id || "";
   return {
     ...state,
     sailors,
     removedSailors,
+    removedFechas,
     events,
     whatsappUrl: parsed.whatsappUrl || state.whatsappUrl,
     ...mergeClassesMeta(state.classes, state.classesAt || 0, parsed.classes, parsed.classesAt || 0),
@@ -174,6 +205,37 @@ function asCloudRow(row: unknown): CloudRow | null {
     return record.data as CloudRow;
   }
   return record;
+}
+
+function parseRemovedFechas(raw: unknown): RemovedFecha[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const stamp = item as { id?: unknown; at?: unknown };
+      const id = String(stamp.id || "").trim();
+      const at = typeof stamp.at === "number" ? stamp.at : 0;
+      if (!id || !at) return null;
+      return { id, at };
+    })
+    .filter((item): item is RemovedFecha => Boolean(item));
+}
+
+function canonicalRemovedFechas(stamps: RemovedFecha[]) {
+  return mergeRemovedFechas([], stamps);
+}
+
+function mergeRemovedFechas(local: RemovedFecha[], remote: RemovedFecha[]) {
+  const map = new Map<string, RemovedFecha>();
+  for (const stamp of [...local, ...remote]) {
+    const previous = map.get(stamp.id);
+    if (!previous || stamp.at > previous.at) map.set(stamp.id, stamp);
+  }
+  return [...map.values()].sort((a, b) => a.id.localeCompare(b.id) || a.at - b.at);
+}
+
+function finalizeEvents(events: Fecha[], removedFechas: RemovedFecha[]) {
+  return compactDuplicateFechas(applyRemovedFechas(events, removedFechas));
 }
 
 function parseRemoved(raw: unknown): RemovedSailor[] {
@@ -362,7 +424,12 @@ function mergeScores(
   return out;
 }
 
-function mergeEvents(local: Fecha[], remote: Fecha[], idMap: Map<string, string>) {
+function mergeEvents(
+  local: Fecha[],
+  remote: Fecha[],
+  idMap: Map<string, string>,
+  removedFechas: RemovedFecha[]
+) {
   const map = new Map<string, Fecha>();
   for (const event of local) {
     map.set(event.id, { ...event, scores: mergeScores(event.scores, {}, idMap) });
@@ -373,14 +440,20 @@ function mergeEvents(local: Fecha[], remote: Fecha[], idMap: Map<string, string>
       map.set(event.id, { ...event, scores: mergeScores({}, event.scores, idMap) });
       continue;
     }
+    const localAt = previous.updatedAt || 0;
+    const remoteAt = event.updatedAt || 0;
+    const winner = remoteAt >= localAt ? event : previous;
+    const loser = winner === event ? previous : event;
+    const scoreAt = { ...(previous.scoreAt || {}), ...(event.scoreAt || {}) };
     map.set(event.id, {
-      ...previous,
-      ...event,
+      ...loser,
+      ...winner,
       racesCount: Math.max(previous.racesCount || 0, event.racesCount || 0),
-      scores: mergeScores(previous.scores, event.scores, idMap)
+      scores: mergeScores(previous.scores, event.scores, idMap),
+      ...(Object.keys(scoreAt).length ? { scoreAt } : {})
     });
   }
-  return canonicalEvents([...map.values()]);
+  return finalizeEvents([...map.values()], removedFechas);
 }
 
 /** La lista de clases completa gana por `classesAt`; no se re-unen borrados desde la nube. */
