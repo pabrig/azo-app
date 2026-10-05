@@ -1,6 +1,6 @@
 import { Client } from "appwrite";
 import { CHAMP_ID, config } from "../config";
-import { cloudPayload, localHasResults, remoteLooksEmpty } from "../domain/cloud";
+import { cloudPayload, cloudView, syncFingerprint } from "../domain/cloud";
 import type { ChampionshipState } from "../domain/types";
 import type { SyncMode } from "../domain/types";
 
@@ -34,6 +34,7 @@ export function createCloudSync(options: {
   let ready = false;
   let connecting = false;
   let applying = false;
+  let pushAfterApply = false;
   let disposed = false;
   let timer = 0;
   let unsubscribe = () => {};
@@ -92,7 +93,11 @@ export function createCloudSync(options: {
   }
 
   function schedule() {
-    if (applying || disposed) return;
+    if (disposed) return;
+    if (applying) {
+      pushAfterApply = true;
+      return;
+    }
     if (!ready) {
       if (!connecting && navigator.onLine && config.appwriteProjectId) void init();
       return;
@@ -101,13 +106,20 @@ export function createCloudSync(options: {
     timer = window.setTimeout(() => void push(), 400);
   }
 
+  function absorb(row: unknown) {
+    options.applyRemote(row);
+    if (!disposed && syncFingerprint(options.getState()) !== syncFingerprint(cloudView(row))) {
+      schedule();
+    }
+  }
+
   function subscribe() {
     try {
       const client = new Client().setEndpoint(config.appwriteEndpoint).setProject(config.appwriteProjectId);
       const channel = `databases.${config.appwriteDatabaseId}.tables.${config.appwriteTableId}.rows.${CHAMP_ID}`;
       unsubscribe = client.subscribe(channel, (message) => {
         const payload = message.payload;
-        if (payload) options.applyRemote(payload);
+        if (payload) absorb(payload);
       });
     } catch (error) {
       console.warn(error);
@@ -124,11 +136,11 @@ export function createCloudSync(options: {
     try {
       const row = await request("GET", rowPath(CHAMP_ID));
       if (disposed) return;
-      const remoteEmpty = remoteLooksEmpty(row);
-      const localHas = localHasResults(options.getState());
       ready = true;
-      if (remoteEmpty || localHas) await push();
-      else options.applyRemote(row);
+      options.applyRemote(row);
+      if (!disposed && syncFingerprint(options.getState()) !== syncFingerprint(cloudView(row))) {
+        await push();
+      }
       if (!disposed) options.onStatus("live", "Appwrite");
     } catch (error) {
       if (disposed) return;
@@ -151,6 +163,10 @@ export function createCloudSync(options: {
     schedule,
     markApplying(value: boolean) {
       applying = value;
+      if (!value && pushAfterApply) {
+        pushAfterApply = false;
+        schedule();
+      }
     },
     isReady: () => ready,
     dispose() {
