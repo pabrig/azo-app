@@ -152,7 +152,12 @@ export function ChampionshipProvider({ children }: { children: ReactNode }) {
           showToast("PIN de comisión requerido");
           return false;
         }
-        commit(saveFecha(stateRef.current, input));
+        const result = saveFecha(stateRef.current, input);
+        if (!result.state) {
+          showToast(result.error || "No se pudo guardar la fecha");
+          return false;
+        }
+        commit(result.state);
         showToast("Fecha guardada");
         return true;
       },

@@ -21,13 +21,19 @@ export function makeFecha(partial: Partial<Fecha> = {}): Fecha {
     ar: bundledDoc(partial.ar, "ar"),
     ir: bundledDoc(partial.ir, "ir"),
     racesCount: partial.racesCount || 3,
-    scores: partial.scores || {}
+    scores: partial.scores || {},
+    ...(partial.updatedAt ? { updatedAt: partial.updatedAt } : {}),
+    ...(partial.scoreAt && Object.keys(partial.scoreAt).length ? { scoreAt: partial.scoreAt } : {})
   };
 }
+
+/** Id fijo: cada celular nuevo arranca con la misma Fecha 1 en lugar de crear otra. */
+export const SEED_FECHA_ID = "f1";
 
 export function seedEvents(): Fecha[] {
   return [
     makeFecha({
+      id: SEED_FECHA_ID,
       name: "Fecha 1",
       date: "2026-10-03",
       time: "12:00",
@@ -86,8 +92,15 @@ export function defaultState(): ChampionshipState {
     events,
     whatsappUrl: DEFAULT_WHATSAPP,
     classes: defaultBoatClasses(),
-    removedSailors: []
+    removedSailors: [],
+    removedFechas: [],
+    whatsappAt: 0,
+    classesAt: 0
   };
+}
+
+export function fechaKey(fecha: { name: string; date: string }) {
+  return `${normalizeName(fecha.name)}|${fecha.date}`;
 }
 
 export function sailorKey(sailor: { sailNumber: string; boatClass: string }) {
@@ -183,6 +196,9 @@ export function normalizeLoadedState(parsed: Partial<ChampionshipState> | null |
     classFilter: typeof parsed.classFilter === "string" ? parsed.classFilter : "ALL",
     whatsappUrl: parsed.whatsappUrl || DEFAULT_WHATSAPP,
     classes: migrateClasses(parsed.classes),
-    removedSailors: Array.isArray(parsed.removedSailors) ? parsed.removedSailors : []
+    removedSailors: Array.isArray(parsed.removedSailors) ? parsed.removedSailors : [],
+    removedFechas: Array.isArray(parsed.removedFechas) ? parsed.removedFechas : [],
+    whatsappAt: typeof parsed.whatsappAt === "number" ? parsed.whatsappAt : 0,
+    classesAt: typeof parsed.classesAt === "number" ? parsed.classesAt : 0
   };
 }
