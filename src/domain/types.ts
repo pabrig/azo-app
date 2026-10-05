@@ -1,4 +1,7 @@
-export const PENALTY_CODES = ["DNC", "DNS", "OCS", "DNF", "DSQ"] as const;
+export const PENALTY_CODES = ["DNC", "DNS", "OCS", "DNF", "DSQ", "DNE"] as const;
+
+/** RRS A9: no se descartan del series score (Ap. A). */
+export const NON_DISCARDABLE_PENALTIES = ["DNE", "DSQ"] as const;
 
 export type PenaltyCode = (typeof PENALTY_CODES)[number];
 
@@ -17,6 +20,8 @@ export type Fecha = {
   ar: RaceDoc;
   ir: RaceDoc;
   racesCount: number;
+  /** Cantidad de peores regatas descartables en el neto de esta fecha (comisión). */
+  discardsAllowed: number;
   scores: Record<string, Array<string | null>>;
   updatedAt?: number;
   scoreAt?: Record<string, number>;
@@ -96,6 +101,7 @@ export type FechaSaveInput = {
   date: string;
   time: string;
   avisos: string;
+  discardsAllowed?: number;
   ar?: RaceDoc;
   ir?: RaceDoc;
 };

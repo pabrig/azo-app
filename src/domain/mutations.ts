@@ -122,9 +122,13 @@ export function addRace(state: ChampionshipState): ChampionshipState {
   if (!current) return state;
   return {
     ...state,
-    events: state.events.map((event) =>
-      event.id === current.id ? { ...event, racesCount: event.racesCount + 1, updatedAt: Date.now() } : event
-    )
+    events: state.events.map((event) => {
+      if (event.id !== current.id) return event;
+      const racesCount = event.racesCount + 1;
+      const maxDiscards = Math.max(0, racesCount - 1);
+      const discardsAllowed = Math.min(event.discardsAllowed ?? 0, maxDiscards);
+      return { ...event, racesCount, discardsAllowed, updatedAt: Date.now() };
+    })
   };
 }
 
@@ -141,7 +145,9 @@ export function removeRace(state: ChampionshipState): ChampionshipState {
         const row = event.scores[sailorId];
         scores[sailorId] = Array.isArray(row) ? row.slice(0, racesCount) : row;
       });
-      return { ...event, racesCount, scores, updatedAt: Date.now() };
+      const maxDiscards = Math.max(0, racesCount - 1);
+      const discardsAllowed = Math.min(event.discardsAllowed ?? 0, maxDiscards);
+      return { ...event, racesCount, discardsAllowed, scores, updatedAt: Date.now() };
     })
   };
 }
@@ -191,6 +197,7 @@ export function saveFecha(
     date: input.date,
     time: input.time,
     avisos: input.avisos.trim(),
+    discardsAllowed: input.discardsAllowed ?? existing?.discardsAllowed,
     ar: input.ar || existing?.ar,
     ir: input.ir || existing?.ir,
     updatedAt: Date.now()
@@ -198,7 +205,14 @@ export function saveFecha(
   const events = existing
     ? state.events.map((event) =>
         event.id === next.id
-          ? { ...existing, ...next, scores: existing.scores, scoreAt: existing.scoreAt, racesCount: existing.racesCount }
+          ? {
+              ...existing,
+              ...next,
+              scores: existing.scores,
+              scoreAt: existing.scoreAt,
+              racesCount: existing.racesCount,
+              discardsAllowed: next.discardsAllowed
+            }
           : event
       )
     : [...state.events, next];

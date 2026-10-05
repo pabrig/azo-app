@@ -11,7 +11,8 @@ const emptyFecha = (): FechaFormState => ({
   name: "",
   date: "",
   time: "12:00",
-  avisos: DEFAULT_AVISOS
+  avisos: DEFAULT_AVISOS,
+  discardsAllowed: 1
 });
 
 const emptyClass = (): ClassFormState => ({
@@ -149,7 +150,8 @@ export function Fechas() {
           name: event.name,
           date: event.date,
           time: event.time,
-          avisos: event.avisos || ""
+          avisos: event.avisos || "",
+          discardsAllowed: event.discardsAllowed ?? (event.racesCount >= 4 ? 1 : 0)
         });
         setFileEpoch((current) => current + 1);
         fechaFormRef.current?.scrollIntoView({ behavior: "smooth" });

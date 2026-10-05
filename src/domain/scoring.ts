@@ -1,5 +1,13 @@
 import { filteredSailors, sailorFechas, sailorsInFecha } from "./model";
-import { PENALTY_CODES, type ChampionshipState, type DateNet, type OverallSailor, type RankedSailor, type Sailor } from "./types";
+import {
+  NON_DISCARDABLE_PENALTIES,
+  PENALTY_CODES,
+  type ChampionshipState,
+  type DateNet,
+  type OverallSailor,
+  type RankedSailor,
+  type Sailor
+} from "./types";
 
 export function fleetSize(state: ChampionshipState, cls: string, fechaKey: string | null) {
   let list = fechaKey ? sailorsInFecha(state, fechaKey) : state.sailors;
@@ -15,6 +23,85 @@ export function pointsFor(raw: string | null | undefined, fleet: number) {
   return Number.isFinite(position) && position > 0 ? position : fleet + 1;
 }
 
+function isDiscardableScore(raw: string | null | undefined) {
+  const code = String(raw ?? "")
+    .trim()
+    .toUpperCase();
+  if (!code) return true;
+  return !(NON_DISCARDABLE_PENALTIES as readonly string[]).includes(code);
+}
+
+export function effectiveDiscardsAllowed(event: { racesCount: number; discardsAllowed?: number }) {
+  const racesCount = event.racesCount || 0;
+  const max = Math.max(0, racesCount - 1);
+  if (typeof event.discardsAllowed === "number" && Number.isFinite(event.discardsAllowed)) {
+    return Math.min(Math.max(0, Math.floor(event.discardsAllowed)), max);
+  }
+  return racesCount >= 4 ? 1 : 0;
+}
+
+function applySeriesDiscard(
+  racePts: number[],
+  raw: Array<string | null | undefined>,
+  discardsAllowed: number
+) {
+  const total = racePts.reduce((sum, points) => sum + points, 0);
+  const allowed = Math.max(0, Math.floor(discardsAllowed));
+  if (!allowed || !racePts.length) return { net: total, discarded: null as number | null };
+
+  const candidates: { index: number; points: number }[] = [];
+  for (let index = 0; index < racePts.length; index += 1) {
+    if (!isDiscardableScore(raw[index])) continue;
+    candidates.push({ index, points: racePts[index] });
+  }
+  candidates.sort((a, b) => b.points - a.points);
+  const picked = candidates.slice(0, allowed);
+  if (!picked.length) return { net: total, discarded: null };
+  const discarded = picked.reduce((sum, item) => sum + item.points, 0);
+  return { net: total - discarded, discarded };
+}
+
+/** RRS A8.1: mejores puntos de regata de cada timonel, de a uno. */
+function compareBestRacePoints(a: number[], b: number[]): number {
+  const left = [...a].sort((x, y) => x - y);
+  const right = [...b].sort((x, y) => x - y);
+  const len = Math.max(left.length, right.length);
+  for (let index = 0; index < len; index += 1) {
+    const diff = (left[index] ?? Number.POSITIVE_INFINITY) - (right[index] ?? Number.POSITIVE_INFINITY);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/** RRS A8.2: última regata (o fecha), luego la anterior. */
+function compareLastRacePoints(a: number[], b: number[]): number {
+  const len = Math.max(a.length, b.length);
+  for (let offset = 0; offset < len; offset += 1) {
+    const index = len - 1 - offset;
+    const diff = (a[index] ?? Number.POSITIVE_INFINITY) - (b[index] ?? Number.POSITIVE_INFINITY);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+function compareLowPointSeries(netA: number, racePtsA: number[], netB: number, racePtsB: number[]) {
+  if (netA !== netB) return netA - netB;
+  let tie = compareBestRacePoints(racePtsA, racePtsB);
+  if (tie !== 0) return tie;
+  tie = compareLastRacePoints(racePtsA, racePtsB);
+  if (tie !== 0) return tie;
+  return 0;
+}
+
+function compareOverall(netA: number, breakdownA: number[], netB: number, breakdownB: number[]) {
+  if (netA !== netB) return netA - netB;
+  let tie = compareBestRacePoints(breakdownA, breakdownB);
+  if (tie !== 0) return tie;
+  tie = compareLastRacePoints(breakdownA, breakdownB);
+  if (tie !== 0) return tie;
+  return 0;
+}
+
 export function dateNet(state: ChampionshipState, sailor: Sailor, fechaKey: string): DateNet {
   const event = state.events.find((item) => item.id === fechaKey);
   if (!event) return { racePts: [], raw: [], net: 0, discarded: null };
@@ -26,19 +113,14 @@ export function dateNet(state: ChampionshipState, sailor: Sailor, fechaKey: stri
     const points = pointsFor(raw[index], fleet);
     return points === null ? fleet + 1 : points;
   });
-  let net = racePts.reduce((sum, points) => sum + points, 0);
-  let discarded: number | null = null;
-  if (event.racesCount >= 4 && racePts.length) {
-    discarded = Math.max(...racePts);
-    net -= discarded;
-  }
+  const { net, discarded } = applySeriesDiscard(racePts, raw, effectiveDiscardsAllowed(event));
   return { racePts, raw, net, discarded };
 }
 
 export function rankedForFecha(state: ChampionshipState, fechaKey: string): RankedSailor[] {
   return filteredSailors(state, fechaKey)
     .map((sailor) => ({ ...sailor, ...dateNet(state, sailor, fechaKey) }))
-    .sort((a, b) => a.net - b.net || a.sailNumber.localeCompare(b.sailNumber));
+    .sort((a, b) => compareLowPointSeries(a.net, a.racePts, b.net, b.racePts) || a.sailNumber.localeCompare(b.sailNumber));
 }
 
 export function rankedOverall(state: ChampionshipState): OverallSailor[] {
@@ -49,5 +131,5 @@ export function rankedOverall(state: ChampionshipState): OverallSailor[] {
       const net = breakdown.reduce((sum, points) => sum + points, 0);
       return { ...sailor, breakdown, net };
     })
-    .sort((a, b) => a.net - b.net || a.sailNumber.localeCompare(b.sailNumber));
+    .sort((a, b) => compareOverall(a.net, a.breakdown, b.net, b.breakdown) || a.sailNumber.localeCompare(b.sailNumber));
 }

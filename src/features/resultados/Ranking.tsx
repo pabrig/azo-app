@@ -34,8 +34,8 @@ export function Ranking() {
       pngFilename="Ranking_General_CNA.png"
       note={
         <p className="text-slate-500">
-          Suma de puntos netos de todas las fechas (menor puntaje gana). Descarte del peor resultado si una fecha tiene 4
-          o más regatas.
+          Suma de puntos netos de cada fecha (menor puntaje gana). Los descartes los define la comisión en Fechas, por
+          fecha.
         </p>
       }
     />

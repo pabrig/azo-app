@@ -18,7 +18,17 @@ export function formatDay(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
+function resolveDiscardsAllowed(partial: Partial<Fecha>) {
+  const racesCount = partial.racesCount || 3;
+  const max = Math.max(0, racesCount - 1);
+  if (typeof partial.discardsAllowed === "number" && Number.isFinite(partial.discardsAllowed)) {
+    return Math.min(Math.max(0, Math.floor(partial.discardsAllowed)), max);
+  }
+  return racesCount >= 4 ? 1 : 0;
+}
+
 export function makeFecha(partial: Partial<Fecha> = {}): Fecha {
+  const racesCount = partial.racesCount || 3;
   return {
     id: partial.id || uid(),
     name: partial.name || "Nueva fecha",
@@ -27,7 +37,8 @@ export function makeFecha(partial: Partial<Fecha> = {}): Fecha {
     avisos: partial.avisos || DEFAULT_AVISOS,
     ar: bundledDoc(partial.ar, "ar"),
     ir: bundledDoc(partial.ir, "ir"),
-    racesCount: partial.racesCount || 3,
+    racesCount,
+    discardsAllowed: resolveDiscardsAllowed({ ...partial, racesCount }),
     scores: partial.scores || {},
     ...(partial.updatedAt ? { updatedAt: partial.updatedAt } : {}),
     ...(partial.scoreAt && Object.keys(partial.scoreAt).length ? { scoreAt: partial.scoreAt } : {})

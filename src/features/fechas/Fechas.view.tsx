@@ -1,4 +1,5 @@
 import type { FormEvent, RefObject } from "react";
+import { effectiveDiscardsAllowed } from "../../domain/scoring";
 import type { BoatClass, Fecha } from "../../domain/types";
 import { Card, Field, controlClass } from "../../ui/primitives";
 
@@ -8,6 +9,7 @@ export type FechaFormState = {
   date: string;
   time: string;
   avisos: string;
+  discardsAllowed: number;
 };
 
 export type ClassFormState = {
@@ -142,6 +144,24 @@ export function FechasView({
                 />
               </Field>
             </div>
+            <Field label="Descartes en el neto (esta fecha)">
+              <input
+                type="number"
+                min={0}
+                max={9}
+                step={1}
+                inputMode="numeric"
+                value={fechaForm.discardsAllowed}
+                onChange={(event) =>
+                  onFechaForm({ discardsAllowed: Math.max(0, Number.parseInt(event.target.value, 10) || 0) })
+                }
+                className={controlClass}
+              />
+              <span className="mt-1 block text-[10px] text-slate-500 leading-relaxed">
+                Cuántas peores regatas restan del total (Low Point). DSQ y DNE no se descartan. Si hay 4 regatas, 1 es lo
+                habitual; en Carga podés sumar regatas después.
+              </span>
+            </Field>
             <Field label="Avisos (TOA)">
               <textarea
                 rows={3}
@@ -216,7 +236,8 @@ export function FechasView({
               </div>
               {isAdmin ? (
                 <p className="text-[11px] text-slate-500">
-                  PDF · AR: {event.ar?.name || "—"} · IR: {event.ir?.name || "—"}
+                  PDF · AR: {event.ar?.name || "—"} · IR: {event.ir?.name || "—"} · Descartes neto:{" "}
+                  {effectiveDiscardsAllowed(event)}
                 </p>
               ) : null}
               <div className="flex gap-2">

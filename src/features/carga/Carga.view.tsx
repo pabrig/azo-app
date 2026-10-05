@@ -78,7 +78,7 @@ export function CargaView({
         </div>
       </div>
       <ClassChips names={classNames} value={classFilter} onChange={onClassFilter} />
-      <p className="text-[10px] text-slate-500 leading-relaxed">Puesto o código: DNC, DNS, OCS, DNF, DSQ.</p>
+      <p className="text-[10px] text-slate-500 leading-relaxed">Puesto o código: DNC, DNS, OCS, DNF, DSQ, DNE.</p>
       {hasEvent ? (
         <div className="data-scroll data-scroll--entry rounded-xl border border-white/10 -mx-0.5">
           <table className="w-full min-w-[16rem] text-left border-collapse">
@@ -117,7 +117,7 @@ export function CargaView({
                                 {position + 1}
                               </option>
                             ))}
-                            {["DNC", "DNS", "OCS", "DNF", "DSQ"].map((code) => (
+                            {["DNC", "DNS", "OCS", "DNF", "DSQ", "DNE"].map((code) => (
                               <option key={code} value={code}>
                                 {code}
                               </option>

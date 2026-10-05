@@ -1,13 +1,14 @@
 import type { FormEvent } from "react";
 import { useChampionship } from "../../app/championship-context";
 import { classNames, currentEvent, effectiveClassFilter, filteredSailors, formatDay } from "../../domain/model";
+import { effectiveDiscardsAllowed } from "../../domain/scoring";
 import { CargaView } from "./Carga.view";
 
 export function Carga() {
   const api = useChampionship();
   const event = currentEvent(api.state);
   const subtitle = event
-    ? `${event.name} · ${formatDay(event.date)} ${event.time} · ${event.racesCount} regata${event.racesCount > 1 ? "s" : ""}`
+    ? `${event.name} · ${formatDay(event.date)} ${event.time} · ${event.racesCount} regata${event.racesCount > 1 ? "s" : ""} · ${effectiveDiscardsAllowed(event)} descarte${effectiveDiscardsAllowed(event) === 1 ? "" : "s"} neto`
     : "Creá una fecha en la pestaña Fechas.";
 
   function onUnlock(formEvent: FormEvent<HTMLFormElement>) {
