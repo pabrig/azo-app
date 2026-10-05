@@ -94,6 +94,28 @@ export function sailorKey(sailor: { sailNumber: string; boatClass: string }) {
   return `${sailor.sailNumber.trim().toUpperCase()}|${sailor.boatClass.trim()}`;
 }
 
+function normalizeName(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+/** Vela, clase y club se repiten entre timoneles: solo el nombre y apellido identifica a la persona. */
+export function personKey(sailor: { name: string }) {
+  return normalizeName(sailor.name);
+}
+
+/** Las bajas viejas no guardaban el nombre y alcanzan a toda la vela de esa clase. */
+export function removalMatches(
+  stamp: { sailNumber: string; boatClass: string; name?: string },
+  sailor: { sailNumber: string; boatClass: string; name: string }
+) {
+  return stamp.name ? personKey({ name: stamp.name }) === personKey(sailor) : sailorKey(stamp) === sailorKey(sailor);
+}
+
 export function boatClasses(state: ChampionshipState): BoatClass[] {
   return state.classes.length ? state.classes : defaultBoatClasses();
 }

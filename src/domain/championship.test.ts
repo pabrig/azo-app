@@ -168,19 +168,93 @@ describe("inscripciones de varios dispositivos", () => {
     remote.removedSailors = [{ sailNumber: "1", boatClass: "ILCA 6", at: 50 }];
     const merged = mergeRemote(local, cloudRow(remote));
     expect(merged.sailors.map((item) => item.name)).toEqual(["Ana"]);
-    expect(merged.removedSailors).toEqual([]);
+    expect(mergeRemote(merged, cloudRow(merged)).sailors.map((item) => item.name)).toEqual(["Ana"]);
   });
 
-  it("junta las fechas de la misma vela y deja una sola ficha", () => {
+  it("junta las fechas de la misma persona anotada en dos celulares", () => {
     const local = defaultState();
     local.sailors = [sailor({ id: "local", sailNumber: "7", name: "Ana", fechas: ["f1"], updatedAt: 10 })];
     const remote = defaultState();
-    remote.sailors = [sailor({ id: "remote", sailNumber: "7", name: "Ana María", fechas: ["f2"], updatedAt: 20 })];
+    remote.sailors = [sailor({ id: "remote", sailNumber: "7", name: "ana ", fechas: ["f2"], updatedAt: 20 })];
     const merged = mergeRemote(local, cloudRow(remote));
     expect(merged.sailors).toHaveLength(1);
     expect(merged.sailors[0].id).toBe("remote");
     expect(merged.sailors[0].fechas).toEqual(["f1", "f2"]);
-    expect(merged.sailors[0].name).toBe("Ana María");
+  });
+
+  it("el mismo nombre y apellido es la misma persona aunque cambie vela, clase o club", () => {
+    let state = defaultState();
+    const fecha = state.events[0].id;
+    state = registerSailor(state, { sailNumber: "86", boatClass: "ILCA 6", name: "Tomas Petersen", category: "General", club: "CNA", fecha }).state;
+    state = registerSailor(state, { sailNumber: "211983", boatClass: "ILCA 7", name: "tomás  petersen", category: "Master", club: "YCA", fecha }).state;
+    expect(state.sailors).toHaveLength(1);
+    expect(state.sailors[0]).toMatchObject({ sailNumber: "211983", boatClass: "ILCA 7", club: "YCA" });
+  });
+
+  it("vela, clase y club repetidos no unen a dos personas distintas", () => {
+    let state = defaultState();
+    const fecha = state.events[0].id;
+    for (const name of ["Ana Gómez", "Beto Ruiz", "Carla Paz"]) {
+      state = registerSailor(state, { sailNumber: "170287", boatClass: "ILCA 6", name, category: "General", club: "CNA", fecha }).state;
+    }
+    expect(state.sailors).toHaveLength(3);
+    expect(mergeRemote(defaultState(), cloudRow(state)).sailors).toHaveLength(3);
+  });
+
+  it("dos timoneles con la misma vela o NN quedan como dos inscriptos", () => {
+    let state = defaultState();
+    const fecha = state.events[0].id;
+    for (const name of ["Pablo Rigalli", "Ramiro Pedernera"]) {
+      state = registerSailor(state, { sailNumber: "NN", boatClass: "ILCA 6", name, category: "General", club: "", fecha }).state;
+    }
+    expect(state.sailors.map((item) => item.name)).toEqual(["Pablo Rigalli", "Ramiro Pedernera"]);
+    const merged = mergeRemote(defaultState(), cloudRow(state));
+    expect(merged.sailors).toHaveLength(2);
+  });
+
+  it("separa a dos personas que una versión vieja dejó con el mismo id", () => {
+    const local = defaultState();
+    local.sailors = [sailor({ id: "x", sailNumber: "NN", name: "Pablo Rigalli", updatedAt: 10 })];
+    const remote = defaultState();
+    remote.sailors = [sailor({ id: "x", sailNumber: "NN", name: "Ramiro Pedernera", updatedAt: 20 })];
+    const merged = mergeRemote(local, cloudRow(remote));
+    expect(merged.sailors).toHaveLength(2);
+    expect(new Set(merged.sailors.map((item) => item.id)).size).toBe(2);
+    expect(merged.sailors.find((item) => item.name === "Ramiro Pedernera")?.id).toBe("x");
+  });
+
+  it("dos celulares que anotan a la vez terminan con todos los inscriptos", () => {
+    const base = defaultState();
+    const fecha = base.events[0].id;
+    let phoneA = base;
+    let phoneB = base;
+    for (let index = 1; index <= 8; index += 1) {
+      phoneA = registerSailor(phoneA, {
+        sailNumber: `A${index}`, boatClass: "ILCA 6", name: `Timonel A${index}`, category: "General", club: "", fecha
+      }).state;
+      phoneB = registerSailor(phoneB, {
+        sailNumber: `B${index}`, boatClass: "ILCA 7", name: `Timonel B${index}`, category: "General", club: "", fecha
+      }).state;
+    }
+    const cloudAfterA = cloudRow(phoneA);
+    phoneB = mergeRemote(phoneB, cloudAfterA);
+    const cloudAfterB = cloudRow(phoneB);
+    phoneA = mergeRemote(phoneA, cloudAfterB);
+    expect(phoneA.sailors).toHaveLength(16);
+    expect(phoneB.sailors).toHaveLength(16);
+    expect(syncFingerprint(phoneA)).toBe(syncFingerprint(phoneB));
+  });
+
+  it("una baja borra solo a esa persona y no a otro con la misma vela", () => {
+    let state = defaultState();
+    const fecha = state.events[0].id;
+    for (const name of ["Ana", "Beto"]) {
+      state = registerSailor(state, { sailNumber: "NN", boatClass: "ILCA 6", name, category: "General", club: "", fecha }).state;
+    }
+    const ana = state.sailors.find((item) => item.name === "Ana");
+    const removed = removeSailor(state, ana!.id);
+    const otherPhone = mergeRemote(state, cloudRow(removed));
+    expect(otherPhone.sailors.map((item) => item.name)).toEqual(["Beto"]);
   });
 
   it("registra la hora de la inscripción y la baja", () => {

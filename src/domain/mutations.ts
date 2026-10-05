@@ -1,4 +1,4 @@
-import { boatClasses, makeFecha, officialWhatsApp, sailorFechas, sailorKey, uid } from "./model";
+import { boatClasses, makeFecha, officialWhatsApp, personKey, removalMatches, sailorFechas, uid } from "./model";
 import type { ChampionshipState, ClassSaveInput, Fecha, FechaSaveInput, RegisterInput } from "./types";
 
 export function selectFecha(state: ChampionshipState, id: string): ChampionshipState {
@@ -14,13 +14,10 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
   const sailNumber = input.sailNumber.trim().toUpperCase();
   const name = input.name.trim();
   const club = input.club.trim().toUpperCase() || "CNA";
-  const removedSailors = state.removedSailors.filter(
-    (stamp) => sailorKey(stamp) !== sailorKey({ sailNumber, boatClass: input.boatClass })
-  );
+  const person = { sailNumber, boatClass: input.boatClass, name };
+  const removedSailors = state.removedSailors.filter((stamp) => !removalMatches(stamp, person));
   const updatedAt = Date.now();
-  const existing = state.sailors.find(
-    (sailor) => sailor.sailNumber === sailNumber && sailor.boatClass === input.boatClass
-  );
+  const existing = state.sailors.find((sailor) => personKey(sailor) === personKey(person));
   if (existing) {
     const fechas = sailorFechas(existing, state.events);
     const nextFechas = fechas.includes(input.fecha) ? fechas.slice() : [...fechas, input.fecha];
@@ -33,6 +30,8 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
             sailor.id === existing.id
               ? {
                   ...sailor,
+                  sailNumber,
+                  boatClass: input.boatClass,
                   name,
                   category: input.category,
                   club,
@@ -84,8 +83,15 @@ export function removeSailor(state: ChampionshipState, id: string): Championship
   const sailor = state.sailors.find((item) => item.id === id);
   const removedSailors = sailor
     ? [
-        ...state.removedSailors.filter((stamp) => sailorKey(stamp) !== sailorKey(sailor)),
-        { sailNumber: sailor.sailNumber, boatClass: sailor.boatClass, at: Date.now() }
+        ...state.removedSailors.filter(
+          (stamp) => !(stamp.name && personKey({ name: stamp.name }) === personKey(sailor))
+        ),
+        {
+          sailNumber: sailor.sailNumber,
+          boatClass: sailor.boatClass,
+          name: sailor.name,
+          at: Math.max(Date.now(), (sailor.updatedAt || 0) + 1)
+        }
       ]
     : state.removedSailors;
   return {

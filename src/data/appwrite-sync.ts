@@ -67,8 +67,43 @@ export function createCloudSync(options: {
     return id ? `${base}/${id}` : base;
   }
 
+  let pushing: Promise<void> | null = null;
+  let pushAgain = false;
+
   async function push() {
     if (!ready || disposed) return;
+    if (pushing) {
+      pushAgain = true;
+      return pushing;
+    }
+    pushing = (async () => {
+      do {
+        pushAgain = false;
+        await writeMerged();
+      } while (pushAgain && !disposed);
+    })().finally(() => {
+      pushing = null;
+    });
+    return pushing;
+  }
+
+  /** Une con la última versión de la nube antes de escribir, para no pisar a otro celular. */
+  async function writeMerged() {
+    try {
+      const latest = await request("GET", rowPath(CHAMP_ID));
+      if (disposed) return;
+      options.applyRemote(latest);
+      if (syncFingerprint(options.getState()) === syncFingerprint(cloudView(latest))) {
+        options.onStatus("live", "Appwrite");
+        return;
+      }
+    } catch (error) {
+      if (!isNotFound(error)) {
+        console.warn(error);
+        if (!disposed) options.onStatus("error", "Sin nube");
+        return;
+      }
+    }
     const data = cloudPayload(options.getState());
     try {
       await request("PATCH", rowPath(CHAMP_ID), { data });
@@ -103,8 +138,24 @@ export function createCloudSync(options: {
       return;
     }
     window.clearTimeout(timer);
-    timer = window.setTimeout(() => void push(), 400);
+    timer = window.setTimeout(() => {
+      timer = 0;
+      void push();
+    }, 400);
   }
+
+  function flush() {
+    if (!timer || disposed) return;
+    window.clearTimeout(timer);
+    timer = 0;
+    void push();
+  }
+
+  const onHide = () => {
+    if (document.visibilityState === "hidden") flush();
+  };
+  document.addEventListener("visibilitychange", onHide);
+  window.addEventListener("pagehide", flush);
 
   function absorb(row: unknown) {
     options.applyRemote(row);
@@ -170,7 +221,10 @@ export function createCloudSync(options: {
     },
     isReady: () => ready,
     dispose() {
+      flush();
       disposed = true;
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", flush);
       window.clearTimeout(timer);
       unsubscribe();
       unsubscribe = () => {};
