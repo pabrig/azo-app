@@ -3,7 +3,6 @@ import { useChampionship } from "../../app/championship-context";
 import { classNames, effectiveClassFilter } from "../../domain/model";
 import { rankedOverall } from "../../domain/scoring";
 import { ResultadosView } from "./Resultados.view";
-import { shareCardPng } from "./share-png";
 
 export function Ranking() {
   const api = useChampionship();
@@ -19,13 +18,6 @@ export function Ranking() {
     net: sailor.net
   }));
 
-  async function onShare() {
-    if (!cardRef.current) return;
-    api.showToast("Generando captura…");
-    const result = await shareCardPng(cardRef.current, "Ranking_General_CNA.png");
-    if (result === "downloaded") api.showToast("Imagen descargada: adjuntála en WhatsApp");
-  }
-
   return (
     <ResultadosView
       cardRef={cardRef}
@@ -38,7 +30,8 @@ export function Ranking() {
       classNames={classNames(api.state)}
       classFilter={filter}
       onClassFilter={api.setClassFilter}
-      onShare={onShare}
+      onToast={api.showToast}
+      pngFilename="Ranking_General_CNA.png"
       note={
         <p className="text-[11px] text-slate-400 px-1">
           Suma de puntos netos de todas las fechas (menor puntaje gana). Descarte del peor resultado si una fecha tiene 4

@@ -3,7 +3,6 @@ import { useChampionship } from "../../app/championship-context";
 import { classNames, currentEvent, effectiveClassFilter, formatDay } from "../../domain/model";
 import { rankedForFecha } from "../../domain/scoring";
 import { ResultadosView } from "./Resultados.view";
-import { shareCardPng } from "./share-png";
 
 export function Placa() {
   const api = useChampionship();
@@ -30,13 +29,7 @@ export function Placa() {
       }))
     : [];
 
-  async function onShare() {
-    if (!cardRef.current) return;
-    api.showToast("Generando captura…");
-    const filename = `Placa_${event?.name || "fecha"}_CNA.png`;
-    const result = await shareCardPng(cardRef.current, filename);
-    if (result === "downloaded") api.showToast("Imagen descargada: adjuntála en WhatsApp");
-  }
+  const pngFilename = `Placa_${(event?.name || "fecha").replace(/\s+/g, "_")}_CNA.png`;
 
   return (
     <ResultadosView
@@ -50,7 +43,8 @@ export function Placa() {
       classNames={classNames(api.state)}
       classFilter={filter}
       onClassFilter={api.setClassFilter}
-      onShare={onShare}
+      onToast={api.showToast}
+      pngFilename={pngFilename}
     />
   );
 }

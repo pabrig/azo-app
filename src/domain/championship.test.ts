@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { cloudPayload, cloudView, mergeRemote, syncFingerprint } from "./cloud";
-import { compactDuplicateFechas, defaultState, migrateClasses, migrateEvents, normalizeLoadedState } from "./model";
+import { cloudPayload, cloudView, mergeClassesMeta, mergeRemote, syncFingerprint } from "./cloud";
+import { defaultState, migrateClasses, migrateEvents } from "./model";
 import { dateNet, fleetSize, pointsFor, rankedForFecha } from "./scoring";
-import { deleteFecha, registerSailor, removeSailor, saveFecha, updateScore } from "./mutations";
+import { deleteBoatClass, registerSailor, removeSailor, saveFecha, updateScore } from "./mutations";
 import type { ChampionshipState, Sailor } from "./types";
 
 describe("puntaje low point", () => {
@@ -80,59 +80,43 @@ describe("fechas y clases heredadas", () => {
     expect(events[0].name).toBe("Fecha 1");
   });
 
-  it("compacta fechas duplicadas con el mismo nombre y día", () => {
-    const base = { ...migrateEvents({ f1: { time: "12:00" } })[0], updatedAt: 5 };
-    const duplicate = { ...base, id: "dup-phone", updatedAt: 1 };
-    const compact = compactDuplicateFechas([base, duplicate]);
-    expect(compact).toHaveLength(1);
-    expect(compact[0].id).toBe("f1");
-  });
-
-  it("elimina fechas y no las revive al sincronizar con la nube", () => {
+  it("borra clases y no las revive la nube si el cambio es más nuevo", () => {
     let local = defaultState();
-    const created = saveFecha(local, {
-      id: "",
-      name: "Fecha 2",
-      date: "2026-11-02",
-      time: "12:00",
-      avisos: ""
-    });
-    local = created.state!;
-    const removedId = local.events.find((event) => event.name === "Fecha 2")!.id;
-    local = deleteFecha(local, removedId)!;
-    expect(local.events.some((event) => event.id === removedId)).toBe(false);
-    expect(local.removedFechas.some((stamp) => stamp.id === removedId)).toBe(true);
+    local = deleteBoatClass(local, "Pampero")!;
+    expect(local.classes.some((item) => item.name === "Pampero")).toBe(false);
+    expect(local.classesAt).toBeGreaterThan(0);
 
     const remote = defaultState();
-    remote.events = [
-      ...remote.events,
-      {
-        ...remote.events[0],
-        id: removedId,
-        name: "Fecha 2",
-        date: "2026-11-02",
-        time: "12:00",
-        avisos: "",
-        updatedAt: 0
-      }
-    ];
+    remote.classesAt = 0;
     const merged = mergeRemote(local, cloudRow(remote));
-    expect(merged.events.some((event) => event.id === removedId)).toBe(false);
+    expect(merged.classes.some((item) => item.name === "Pampero")).toBe(false);
+    expect(merged.classesAt).toBe(local.classesAt);
   });
 
-  it("al cargar estado local junta fechas duplicadas y respeta bajas", () => {
-    const seed = defaultState().events[0];
-    const loaded = normalizeLoadedState({
-      events: [
-        { ...seed, updatedAt: 5 },
-        { ...seed, id: "ghost", racesCount: 0, updatedAt: 1 }
-      ],
-      removedFechas: [{ id: "ghost", at: 100 }],
-      sailors: [],
-      fecha: "f1"
-    });
-    expect(loaded.events).toHaveLength(1);
-    expect(loaded.events[0].id).toBe("f1");
+  it("reubica inscriptos al borrar una clase", () => {
+    let state = defaultState();
+    const fecha = state.events[0].id;
+    state = registerSailor(state, {
+      sailNumber: "1",
+      boatClass: "Pampero",
+      name: "Ana Test",
+      category: "General",
+      club: "CNA",
+      fecha
+    }).state;
+    state = deleteBoatClass(state, "Pampero")!;
+    expect(state.sailors[0].boatClass).not.toBe("Pampero");
+    expect(state.classes.some((item) => item.name === "Pampero")).toBe(false);
+  });
+
+  it("mergeClassesMeta respeta el timestamp más reciente", () => {
+    const local = [{ name: "ILCA 6", categories: ["General"] }];
+    const remote = [
+      { name: "ILCA 6", categories: ["General"] },
+      { name: "Optimist", categories: ["General"] }
+    ];
+    expect(mergeClassesMeta(local, 200, remote, 50).classes.map((item) => item.name)).toEqual(["ILCA 6"]);
+    expect(mergeClassesMeta(local, 50, remote, 200).classes.map((item) => item.name)).toEqual(["ILCA 6", "Optimist"]);
   });
 
   it("conserva resultados al editar una fecha", () => {
