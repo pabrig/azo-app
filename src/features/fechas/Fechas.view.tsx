@@ -8,6 +8,7 @@ export type FechaFormState = {
   date: string;
   time: string;
   avisos: string;
+  discardsAllowed: number;
 };
 
 export type ClassFormState = {
@@ -60,7 +61,7 @@ export function FechasView({
   onClassForm: (patch: Partial<ClassFormState>) => void;
   onSaveClass: (event: FormEvent) => void;
   onEditClass: (name: string) => void;
-  onDeleteClass: (name: string) => void;
+  onDeleteClass: (name: string) => void | Promise<void>;
   fechaForm: FechaFormState;
   fechaFormRef: RefObject<HTMLFormElement | null>;
   fechaIsEdit: boolean;
@@ -72,7 +73,7 @@ export function FechasView({
   onResetFecha: () => void;
   onBeginNewFecha: () => void;
   onEditFecha: (id: string) => void;
-  onDeleteFecha: (id: string) => void;
+  onDeleteFecha: (id: string) => void | Promise<void>;
   onDownload: (id: string, kind: "ar" | "ir") => void;
   editingFechaId: string;
   configOpen: boolean;

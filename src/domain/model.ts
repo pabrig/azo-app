@@ -6,7 +6,11 @@ import {
   DEFAULT_WHATSAPP,
   migrateClassCategories
 } from "./defaults";
+import { canonicalBoatClassName, sameBoatClass } from "./class-names";
+import { applyCanonicalClassNames } from "./migrate-championship";
 import type { BoatClass, ChampionshipState, Fecha, RemovedFecha, Sailor } from "./types";
+
+export { canonicalBoatClassName, sameBoatClass } from "./class-names";
 
 export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -33,13 +37,18 @@ export function isFechaRegistrationClosed(fecha: Fecha, todayIso = todayLocalIso
   return day < todayIso;
 }
 
+/** Descarte por defecto del campeonato (3+ regatas → 1, como placa oficial). */
+export function defaultDiscardsAllowed(racesCount: number) {
+  return racesCount >= 3 ? 1 : 0;
+}
+
 function resolveDiscardsAllowed(partial: Partial<Fecha>) {
   const racesCount = partial.racesCount || 3;
   const max = Math.max(0, racesCount - 1);
   if (typeof partial.discardsAllowed === "number" && Number.isFinite(partial.discardsAllowed)) {
     return Math.min(Math.max(0, Math.floor(partial.discardsAllowed)), max);
   }
-  return racesCount >= 4 ? 1 : 0;
+  return defaultDiscardsAllowed(racesCount);
 }
 
 export function makeFecha(partial: Partial<Fecha> = {}): Fecha {
@@ -230,8 +239,11 @@ export function classNames(state: ChampionshipState) {
 }
 
 export function effectiveClassFilter(state: ChampionshipState) {
-  if (state.classFilter !== "ALL" && !classNames(state).includes(state.classFilter)) return "ALL";
-  return state.classFilter;
+  if (state.classFilter === "ALL") return "ALL";
+  const filter = canonicalBoatClassName(state.classFilter);
+  const names = classNames(state);
+  if (!names.some((name) => sameBoatClass(name, filter))) return "ALL";
+  return names.find((name) => sameBoatClass(name, filter)) || filter;
 }
 
 export function currentEvent(state: ChampionshipState): Fecha | null {
@@ -257,7 +269,7 @@ export function filteredSailors(state: ChampionshipState, fechaKey: string | nul
   const list = fechaKey ? sailorsInFecha(state, fechaKey) : state.sailors.slice();
   const filter = effectiveClassFilter(state);
   if (filter === "ALL") return list;
-  return list.filter((sailor) => sailor.boatClass === filter);
+  return list.filter((sailor) => sameBoatClass(sailor.boatClass, filter));
 }
 
 export function officialWhatsApp(state: ChampionshipState) {
@@ -265,7 +277,7 @@ export function officialWhatsApp(state: ChampionshipState) {
 }
 
 export function categoriesForClass(state: ChampionshipState, className: string) {
-  const found = boatClasses(state).find((item) => item.name === className);
+  const found = boatClasses(state).find((item) => sameBoatClass(item.name, className));
   return found?.categories.length ? found.categories : [...DEFAULT_CLASS_CATEGORIES];
 }
 
@@ -275,12 +287,19 @@ export function preferredClassName(state: ChampionshipState) {
   return names[0] || "";
 }
 
+/** Placa y ranking: nunca “Todas”; si el estado global es ALL, usa la clase preferida. */
+export function resultsClassFilter(state: ChampionshipState) {
+  const filter = effectiveClassFilter(state);
+  if (filter === "ALL") return preferredClassName(state);
+  return filter;
+}
+
 export function normalizeLoadedState(parsed: Partial<ChampionshipState> | null | undefined): ChampionshipState {
   if (!parsed) return defaultState();
   const removedFechas = Array.isArray(parsed.removedFechas) ? parsed.removedFechas : [];
   const events = compactDuplicateFechas(applyRemovedFechas(migrateEvents(parsed.events), removedFechas));
   const fecha = events.some((event) => event.id === parsed.fecha) ? parsed.fecha || "" : events[0]?.id || "";
-  return {
+  return applyCanonicalClassNames({
     ...defaultState(),
     ...parsed,
     sailors: Array.isArray(parsed.sailors) ? parsed.sailors : [],
@@ -293,5 +312,5 @@ export function normalizeLoadedState(parsed: Partial<ChampionshipState> | null |
     removedFechas,
     whatsappAt: typeof parsed.whatsappAt === "number" ? parsed.whatsappAt : 0,
     classesAt: typeof parsed.classesAt === "number" ? parsed.classesAt : 0
-  };
+  });
 }

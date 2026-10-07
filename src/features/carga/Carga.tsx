@@ -1,7 +1,9 @@
 import type { FormEvent } from "react";
 import { useChampionship } from "../../app/championship-context";
 import { classNames, currentEvent, effectiveClassFilter, filteredSailors, formatDay } from "../../domain/model";
-import { effectiveDiscardsAllowed } from "../../domain/scoring";
+import { canonicalScoreCell } from "../../domain/score-entry";
+import { dateNet, effectiveDiscardsAllowed, formatRaceCellDisplay, raceIndexesWithResults } from "../../domain/scoring";
+import type { Sailor } from "../../domain/types";
 import { CargaView } from "./Carga.view";
 
 export function Carga() {
@@ -33,6 +35,17 @@ export function Carga() {
       onAddRace={api.addRace}
       onRemoveRace={api.removeRace}
       onScore={api.updateScore}
+      raceCellLegend={
+        event
+          ? (sailor: Sailor, raceIndex: number) => {
+              if (!raceIndexesWithResults(event).includes(raceIndex)) return null;
+              const raw = event.scores[sailor.id]?.[raceIndex];
+              const { discardedRaceIndexes } = dateNet(api.state, sailor, event.id);
+              if (!canonicalScoreCell(raw) && !discardedRaceIndexes.includes(raceIndex)) return null;
+              return formatRaceCellDisplay(raw, raceIndex, discardedRaceIndexes);
+            }
+          : undefined
+      }
     />
   );
 }

@@ -4,15 +4,18 @@ export function ClassChips({
   names,
   value,
   onChange,
-  title = "Clases"
+  title = "Clases",
+  showAll = true
 }: {
   names: string[];
   value: string;
   onChange: (value: string) => void;
   /** Encabezado sobre la fila de pills (vacío para ocultar). */
   title?: string;
+  /** Carga: true. Placa/Ranking: false (siempre una clase). */
+  showAll?: boolean;
 }) {
-  const items = ["ALL", ...names] as const;
+  const items = (showAll ? ["ALL", ...names] : names) as readonly string[];
 
   return (
     <div className="class-chips-block">

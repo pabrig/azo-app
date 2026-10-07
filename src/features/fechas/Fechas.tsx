@@ -4,6 +4,7 @@ import { downloadDoc } from "../../data/download-doc";
 import { readFileAsDataUrl } from "../../data/read-file";
 import { DEFAULT_AVISOS, DEFAULT_CLASS_CATEGORIES } from "../../domain/defaults";
 import { boatClasses, officialWhatsApp, suggestNextFechaName } from "../../domain/model";
+import { useConfirm } from "../../ui/confirm";
 import { FechasView, type ClassFormState, type FechaFormState } from "./Fechas.view";
 
 const emptyFecha = (): FechaFormState => ({
@@ -37,6 +38,7 @@ function pdfUpload(value: FormDataEntryValue | null) {
 
 export function Fechas() {
   const api = useChampionship();
+  const confirm = useConfirm();
   const classes = boatClasses(api.state);
   const [whatsappUrl, setWhatsappUrl] = useState(() => officialWhatsApp(api.state));
   const [classForm, setClassForm] = useState<ClassFormState>(emptyClass);
@@ -128,18 +130,21 @@ export function Fechas() {
           classFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }, 50);
       }}
-      onDeleteClass={(name) => {
+      onDeleteClass={async (name) => {
         if (classes.length <= 1) {
           api.showToast("Debe quedar al menos una clase");
           return;
         }
         const used = api.state.sailors.filter((sailor) => sailor.boatClass === name).length;
-        const accepted = used
-          ? window.confirm(
-              `Hay ${used} inscripto(s) en ${name}. Si borrás la clase, pasan a la primera clase restante (no depende de fechas). ¿Continuar?`
-            )
-          : window.confirm(`¿Borrar la clase ${name}?`);
-        if (accepted && !api.deleteBoatClass(name)) return;
+        const ok = await confirm({
+          title: `Borrar ${name}`,
+          message: used
+            ? `Hay ${used} inscripto(s) en ${name}. Si borrás la clase, pasan a la primera clase restante (no depende de fechas).`
+            : `¿Borrar la clase ${name}?`,
+          confirmLabel: "Borrar",
+          danger: true
+        });
+        if (ok && !api.deleteBoatClass(name)) return;
       }}
       fechaForm={fechaForm}
       fechaFormRef={fechaFormRef}
@@ -161,21 +166,27 @@ export function Fechas() {
           date: event.date,
           time: event.time,
           avisos: event.avisos || "",
-          discardsAllowed: event.discardsAllowed ?? (event.racesCount >= 4 ? 1 : 0)
+          discardsAllowed: event.discardsAllowed ?? (event.racesCount >= 3 ? 1 : 0)
         });
         setFileEpoch((current) => current + 1);
         window.setTimeout(() => {
           fechaFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }, 50);
       }}
-      onDeleteFecha={(id) => {
+      onDeleteFecha={async (id) => {
         if (api.state.events.length <= 1) {
           api.showToast("Dejá al menos una fecha");
           return;
         }
         const event = api.state.events.find((item) => item.id === id);
         const label = event?.name || "esta fecha";
-        if (!window.confirm(`¿Eliminar ${label} y sus resultados? No se puede deshacer.`)) return;
+        const ok = await confirm({
+          title: `Eliminar ${label}`,
+          message: `Se borran ${label} y sus resultados. No se puede deshacer.`,
+          confirmLabel: "Eliminar",
+          danger: true
+        });
+        if (!ok) return;
         api.deleteFecha(id);
       }}
       onDownload={(id, kind) => {

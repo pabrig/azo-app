@@ -77,6 +77,8 @@ export type DateNet = {
   raw: Array<string | null | undefined>;
   net: number;
   discarded: number | null;
+  /** Índices de regata cuyo puntaje se descartó en el neto de la fecha. */
+  discardedRaceIndexes: number[];
 };
 
 export type RankedSailor = Sailor & DateNet;

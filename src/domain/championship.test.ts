@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { cloudPayload, cloudView, mergeClassesMeta, mergeRemote, syncFingerprint } from "./cloud";
+import { sameBoatClass } from "./class-names";
+import { canonicalBoatClassName, migrateChampionshipState } from "./migrate-championship";
 import { defaultState, isFechaRegistrationClosed, makeFecha, migrateClasses, migrateEvents } from "./model";
-import { dateNet, fleetSize, pointsFor, rankedForFecha, rankedOverall } from "./scoring";
+import { normalizeScoreEntry } from "./score-entry";
+import {
+  dateNet,
+  effectiveDiscardsAllowed,
+  fechaResultsStarted,
+  fleetSize,
+  placaColumns,
+  pointsFor,
+  raceIndexesWithResults,
+  rankedForFecha,
+  rankedOverall
+} from "./scoring";
 import {
   deleteBoatClass,
   deleteFecha,
@@ -61,6 +74,15 @@ describe("puntaje low point", () => {
     expect(fleetSize(state, "ILCA 6", fechaId)).toBe(2);
     expect(net.discarded).toBe(8);
     expect(net.net).toBe(6);
+  });
+
+  it("normaliza Descalificado a DSQ al cargar y no lo descarta del neto", () => {
+    expect(normalizeScoreEntry("Descalificado")).toBe("DSQ");
+    expect(normalizeScoreEntry("descalificado")).toBe("DSQ");
+    let state = defaultState();
+    state.events[0].racesCount = 4;
+    state = updateScore(state, "s1", 3, "Descalificado");
+    expect(state.events[0].scores.s1?.[3]).toBe("DSQ");
   });
 
   it("no descarta DSQ ni DNE aunque sean el peor puntaje", () => {
@@ -164,6 +186,142 @@ describe("puntaje low point", () => {
     expect(ranked.map((item) => item.id)).toEqual(["b", "a"]);
   });
 
+  it("fecha 1 CampeonatAzo 03/10/2026 — laser radial (ILCA 6), 3 regatas y 1 descarte", () => {
+    let state = defaultState();
+    const fechaId = state.events[0].id;
+    state.events[0].racesCount = 3;
+    state.events[0].discardsAllowed = 1;
+    state.events[0].date = "2026-10-03";
+
+    const mk = (id: string, name: string, sailNumber: string) => ({
+      id,
+      sailNumber,
+      boatClass: "ILCA 6",
+      name,
+      category: "General",
+      club: "CNA",
+      fechas: [fechaId] as string[]
+    });
+
+    state = {
+      ...state,
+      classFilter: "ILCA 6",
+      sailors: [
+        mk("santiago", "Santiago Pando", "ARG S1"),
+        mk("tomas", "Tomas Petersen", "ARG T1"),
+        mk("pablo", "Pablo Rigalli", "ARG P1"),
+        mk("jose", "José Zafarian", "ARG J1"),
+        mk("ahutiz", "Ahutiz Caracciolo", "ARG A1"),
+        mk("ramiro", "Ramiro Pedernera", "ARG R1"),
+        mk("leo", "Leonardo Semenzato", "ARG L1")
+      ]
+    };
+
+    state.events[0].scores = {
+      santiago: ["2", "1", "1"],
+      tomas: ["1", "2", "3"],
+      pablo: ["3", "DNF", "4"],
+      jose: ["DNC", "DNF", "2"]
+    };
+
+    expect(fleetSize(state, "ILCA 6", fechaId)).toBe(7);
+    const santiago = dateNet(state, state.sailors[0], fechaId);
+    expect(santiago.net).toBe(2);
+    expect(santiago.discardedRaceIndexes).toEqual([0]);
+    expect(dateNet(state, state.sailors[1], fechaId).net).toBe(3);
+    expect(dateNet(state, state.sailors[2], fechaId).net).toBe(7);
+    expect(dateNet(state, state.sailors[3], fechaId).net).toBe(10);
+
+    const ranked = rankedForFecha(state, fechaId);
+    expect(ranked.slice(0, 4).map((s) => s.name)).toEqual([
+      "Santiago Pando",
+      "Tomas Petersen",
+      "Pablo Rigalli",
+      "José Zafarian"
+    ]);
+
+    const overall = rankedOverall(state);
+    expect(overall[0].net).toBe(2);
+    expect(overall[0].name).toBe("Santiago Pando");
+  });
+
+  it("3 regatas sin descarte configurado usa 1 descarte por defecto", () => {
+    const state = defaultState();
+    expect(state.events[0].discardsAllowed).toBe(1);
+    expect(effectiveDiscardsAllowed(state.events[0])).toBe(1);
+  });
+
+  it("fecha sin carga de comisión no suma DNC ni aparece en placa/ranking", () => {
+    let state = defaultState();
+    const fechaId = state.events[0].id;
+    state = saveFecha(state, {
+      id: "",
+      name: "Fecha 2",
+      date: "2026-12-01",
+      time: "12:00",
+      avisos: ""
+    }).state!;
+    const futureId = state.events.find((event) => event.name === "Fecha 2")!.id;
+    state = {
+      ...state,
+      sailors: [
+        {
+          id: "a",
+          sailNumber: "ARG 1",
+          boatClass: "ILCA 6",
+          name: "Ana",
+          category: "General",
+          club: "CNA",
+          fechas: [fechaId, futureId]
+        }
+      ]
+    };
+    expect(fechaResultsStarted(state.events.find((event) => event.id === futureId)!)).toBe(false);
+    expect(dateNet(state, state.sailors[0], futureId).net).toBe(0);
+    expect(rankedForFecha(state, futureId)).toEqual([]);
+
+    state.events.find((event) => event.id === fechaId)!.racesCount = 1;
+    state = updateScore({ ...state, fecha: fechaId }, "a", 0, "1");
+    const overall = rankedOverall(state);
+    expect(overall[0].breakdown).toEqual([1]);
+    expect(overall[0].net).toBe(1);
+  });
+
+  it("placa solo muestra columnas de regatas con al menos un resultado cargado", () => {
+    let state = defaultState();
+    const fechaId = state.events[0].id;
+    state.events[0].racesCount = 3;
+    state = {
+      ...state,
+      sailors: [
+        {
+          id: "a",
+          sailNumber: "ARG 1",
+          boatClass: "ILCA 6",
+          name: "Ana",
+          category: "General",
+          club: "CNA",
+          fechas: [fechaId]
+        },
+        {
+          id: "b",
+          sailNumber: "ARG 2",
+          boatClass: "ILCA 6",
+          name: "Beto",
+          category: "General",
+          club: "CNA",
+          fechas: [fechaId]
+        }
+      ]
+    };
+    state = updateScore({ ...state, fecha: fechaId }, "a", 0, "1");
+    state = updateScore({ ...state, fecha: fechaId }, "b", 0, "2");
+    const event = state.events.find((item) => item.id === fechaId)!;
+    expect(raceIndexesWithResults(event)).toEqual([0]);
+    expect(placaColumns(event)).toEqual(["R1"]);
+    expect(dateNet(state, state.sailors[1], fechaId).net).toBe(2);
+  });
+
   it("ordena la fecha por puntaje neto", () => {
     let state = defaultState();
     const fechaId = state.events[0].id;
@@ -194,6 +352,41 @@ describe("puntaje low point", () => {
     state = updateScore({ ...state, fecha: fechaId }, "b", 0, "2");
     const ranked = rankedForFecha(state, fechaId);
     expect(ranked.map((sailor) => sailor.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("migrate championship", () => {
+  it("sameBoatClass agrupa alias con ILCA 6/7 para flota y filtros", () => {
+    expect(sameBoatClass("Laser radial", "ILCA 6")).toBe(true);
+    expect(sameBoatClass("Laser std", "ILCA 7")).toBe(true);
+    expect(sameBoatClass("Pampero", "ILCA 6")).toBe(false);
+  });
+
+  it("renombra laser radial/std a ILCA 6/7 y ajusta descartes", () => {
+    expect(canonicalBoatClassName("Laser radial")).toBe("ILCA 6");
+    expect(canonicalBoatClassName("Laser std")).toBe("ILCA 7");
+
+    let state = defaultState();
+    state.sailors = [
+      {
+        id: "1",
+        sailNumber: "A",
+        boatClass: "Laser radial",
+        name: "Ana",
+        category: "General",
+        club: "CNA",
+        fechas: [state.events[0].id]
+      }
+    ];
+    state.classes = [{ name: "Laser std", categories: ["General"] }];
+    state.events[0].discardsAllowed = 0;
+    state.events[0].racesCount = 3;
+
+    const { state: next, report } = migrateChampionshipState(state);
+    expect(next.sailors[0].boatClass).toBe("ILCA 6");
+    expect(next.classes.some((c) => c.name === "ILCA 7")).toBe(true);
+    expect(next.events[0].discardsAllowed).toBe(1);
+    expect(report.some((line) => line.includes("descartes"))).toBe(true);
   });
 });
 

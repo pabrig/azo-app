@@ -19,6 +19,7 @@ export function AppShellView({
   onLogout,
   onTab,
   canal,
+  fechaBrief,
   children
 }: {
   sync: SyncStatus;
@@ -33,6 +34,7 @@ export function AppShellView({
   onLogout: () => void;
   onTab: (tab: TabId) => void;
   canal: ReactNode;
+  fechaBrief: ReactNode;
   children: ReactNode;
 }) {
   const [versionNotesOpen, setVersionNotesOpen] = useState(false);
@@ -89,6 +91,7 @@ export function AppShellView({
       <main className="app-main flex-1 min-h-0 overflow-y-auto">
         <div className="app-main-inner space-y-2.5 sm:space-y-3 lg:space-y-4">
           {canal}
+          {fechaBrief}
           {showFechaBar ? (
             <div className="fecha-bar-wrap bg-sea-900/60 p-1 lg:p-1.5 rounded-xl border border-white/10">
               <FechaBar events={events} activeId={activeFechaId} onSelect={onSelectFecha} />

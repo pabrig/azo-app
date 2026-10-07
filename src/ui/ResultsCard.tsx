@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { ScoreCellLegend } from "./ScoreCellLegend";
 
 export type ResultRow = {
   id: string;
@@ -24,7 +24,6 @@ const td = "px-1.5 py-1.5 lg:px-2 lg:py-2 align-middle text-[11px] lg:text-[13px
 const tdBody = `${td} text-slate-300`;
 
 export function ResultsCard({
-  cardRef,
   title,
   classLabel,
   year,
@@ -32,7 +31,6 @@ export function ResultsCard({
   columns,
   rows
 }: {
-  cardRef: RefObject<HTMLDivElement | null>;
   title: string;
   classLabel: string;
   year: string;
@@ -42,7 +40,7 @@ export function ResultsCard({
 }) {
   const colSpan = 5 + columns.length;
   return (
-    <div ref={cardRef} className="results-card bg-sea-800 rounded-xl p-2.5 sm:p-3 lg:p-4 border border-white/10 space-y-2 lg:space-y-3">
+    <div className="results-card bg-sea-800 rounded-xl p-2.5 sm:p-3 lg:p-4 border border-white/10 space-y-2 lg:space-y-3">
       <div className="results-card__head flex items-start justify-between gap-1.5 border-b border-white/10 pb-2 lg:pb-3">
         <div className="flex items-center gap-2 lg:gap-3 min-w-0">
           <img
@@ -105,7 +103,7 @@ export function ResultsCard({
                       key={`${row.id}-${cellIndex}`}
                       className={`${tdBody} text-center tabular-nums whitespace-nowrap`}
                     >
-                      {cell}
+                      <ScoreCellLegend text={cell} />
                     </td>
                   ))}
                   <td className={`${td} results-col-net text-center font-black text-cyan-300 tabular-nums`}>

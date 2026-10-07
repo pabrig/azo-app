@@ -9,6 +9,7 @@ import {
   sailorFechas,
   uid
 } from "./model";
+import { normalizeScoreEntry } from "./score-entry";
 import type { ChampionshipState, ClassSaveInput, Fecha, FechaSaveInput, RegisterInput } from "./types";
 
 export function selectFecha(state: ChampionshipState, id: string): ChampionshipState {
@@ -165,7 +166,8 @@ export function updateScore(
     events: state.events.map((event) => {
       if (event.id !== current.id) return event;
       const previous = event.scores[sailorId] ? [...event.scores[sailorId]] : [];
-      previous[raceIdx] = value === "" ? null : value;
+      previous[raceIdx] =
+        value === "" ? null : normalizeScoreEntry(value) ?? value.trim().toUpperCase();
       return {
         ...event,
         scores: { ...event.scores, [sailorId]: previous },

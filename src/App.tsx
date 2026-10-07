@@ -1,10 +1,13 @@
 import { ChampionshipProvider } from "./app/ChampionshipProvider";
 import { AppShell } from "./features/shell/AppShell";
+import { ConfirmProvider } from "./ui/confirm";
 
 export function App() {
   return (
-    <ChampionshipProvider>
-      <AppShell />
-    </ChampionshipProvider>
+    <ConfirmProvider>
+      <ChampionshipProvider>
+        <AppShell />
+      </ChampionshipProvider>
+    </ConfirmProvider>
   );
 }

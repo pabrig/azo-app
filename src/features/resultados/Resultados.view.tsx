@@ -1,10 +1,9 @@
-import type { ReactNode, RefObject } from "react";
-import { ClassChips } from "../../ui/primitives";
+import type { ReactNode } from "react";
+import { ClassChips } from "../../ui/ClassChips";
 import { ResultsCard, type ResultRow } from "../../ui/ResultsCard";
-import { ComprobanteToolbar } from "./ComprobanteToolbar";
+import { PdfExportLink } from "./PdfExportLink";
 
 export function ResultadosView({
-  cardRef,
   title,
   classLabel,
   year,
@@ -14,11 +13,9 @@ export function ResultadosView({
   classNames,
   classFilter,
   onClassFilter,
-  onToast,
-  pngFilename,
+  pdfFilename,
   note
 }: {
-  cardRef: RefObject<HTMLDivElement | null>;
   title: string;
   classLabel: string;
   year: string;
@@ -28,36 +25,29 @@ export function ResultadosView({
   classNames: string[];
   classFilter: string;
   onClassFilter: (value: string) => void;
-  onToast: (message: string) => void;
-  pngFilename: string;
+  pdfFilename: string;
   note?: ReactNode;
 }) {
   return (
     <div className="results-layout">
       <div className="results-layout__filters">
-        <ClassChips title="Resultados" names={classNames} value={classFilter} onChange={onClassFilter} />
+        <ClassChips
+          title="Resultados"
+          names={classNames}
+          value={classFilter}
+          onChange={onClassFilter}
+          showAll={false}
+        />
       </div>
 
-      <div className="results-layout__body">
-        <div className="results-layout__main min-w-0">
-          <ResultsCard
-            cardRef={cardRef}
-            title={title}
-            classLabel={classLabel}
-            year={year}
-            stamp={stamp}
-            columns={columns}
-            rows={rows}
-          />
-          <div className="lg:hidden">
-            <ComprobanteToolbar cardRef={cardRef} filename={pngFilename} onToast={onToast} />
-          </div>
-          {note ? <div className="results-layout__note">{note}</div> : null}
-        </div>
+      <ResultsCard title={title} classLabel={classLabel} year={year} stamp={stamp} columns={columns} rows={rows} />
 
-        <aside className="results-layout__rail hidden lg:block">
-          <ComprobanteToolbar cardRef={cardRef} filename={pngFilename} onToast={onToast} />
-        </aside>
+      <div className="results-layout__footer">
+        {note ? <div className="results-layout__note">{note}</div> : <span />}
+        <PdfExportLink
+          disabled={!rows.length}
+          payload={{ title, classLabel, year, stamp, columns, rows, filename: pdfFilename }}
+        />
       </div>
     </div>
   );

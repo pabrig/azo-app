@@ -1,4 +1,5 @@
 import { defaultBoatClasses, DEFAULT_WHATSAPP } from "./defaults";
+import { applyCanonicalClassNames } from "./migrate-championship";
 import {
   applyRemovedFechas,
   boatClasses,
@@ -186,7 +187,7 @@ export function mergeRemote(state: ChampionshipState, row: unknown): Championshi
   const removedFechas = mergeRemovedFechas(state.removedFechas, parsed.removedFechas);
   const events = mergeEvents(state.events, parsed.events, idMap, removedFechas);
   const fecha = events.some((event) => event.id === state.fecha) ? state.fecha : events[0]?.id || "";
-  return {
+  return applyCanonicalClassNames({
     ...state,
     sailors,
     removedSailors,
@@ -195,7 +196,7 @@ export function mergeRemote(state: ChampionshipState, row: unknown): Championshi
     whatsappUrl: parsed.whatsappUrl || state.whatsappUrl,
     ...mergeClassesMeta(state.classes, state.classesAt || 0, parsed.classes, parsed.classesAt || 0),
     fecha
-  };
+  });
 }
 
 function asCloudRow(row: unknown): CloudRow | null {

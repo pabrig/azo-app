@@ -9,3 +9,5 @@ node_modules/
 !.env.example
 .vercel
 firebase-config.local.js
+scripts/output/
+public/dev-championship.json

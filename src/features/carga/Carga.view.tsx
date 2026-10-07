@@ -1,5 +1,7 @@
 import type { FormEvent } from "react";
+import { canonicalScoreCell, COMMISSION_PENALTY_OPTIONS } from "../../domain/score-entry";
 import type { Sailor } from "../../domain/types";
+import { ScoreCellLegend } from "../../ui/ScoreCellLegend";
 import { Card, ClassChips, controlClass } from "../../ui/primitives";
 
 export function CargaView({
@@ -15,7 +17,8 @@ export function CargaView({
   onClassFilter,
   onAddRace,
   onRemoveRace,
-  onScore
+  onScore,
+  raceCellLegend
 }: {
   locked: boolean;
   hasEvent: boolean;
@@ -30,6 +33,7 @@ export function CargaView({
   onAddRace: () => void;
   onRemoveRace: () => void;
   onScore: (sailorId: string, raceIndex: number, value: string) => void;
+  raceCellLegend?: (sailor: Sailor, raceIndex: number) => string | null;
 }) {
   if (locked) {
     return (
@@ -82,7 +86,7 @@ export function CargaView({
           <ClassChips title="Clases" names={classNames} value={classFilter} onChange={onClassFilter} />
         </div>
         <p className="carga-layout__hint text-[10px] lg:text-xs text-slate-500 leading-relaxed">
-          Puesto o código: DNC, DNS, OCS, DNF, DSQ, DNE.
+          Puesto 1–30 o penalización (p. ej. Descalificado = DSQ; no se descarta del neto).
         </p>
         <div className="carga-layout__table min-w-0">
       {hasEvent ? (
@@ -110,27 +114,33 @@ export function CargaView({
                         <p className="font-mono font-bold text-cyan-400 text-[11px] leading-tight">{sailor.sailNumber}</p>
                         <p className="text-[10px] text-slate-400 leading-snug line-clamp-2 mt-0.5">{sailor.name}</p>
                       </td>
-                      {columns.map((index) => (
-                        <td key={index} className="px-1 py-1.5 text-center align-middle">
-                          <select
-                            value={scores[index] ?? ""}
-                            onChange={(event) => onScore(sailor.id, index, event.target.value)}
-                            className="w-[3.35rem] max-w-full h-9 bg-sea-900 border border-white/10 rounded-lg text-center text-[13px] font-bold tabular-nums"
-                          >
-                            <option value="">—</option>
-                            {Array.from({ length: 30 }, (_, position) => (
-                              <option key={position + 1} value={String(position + 1)}>
-                                {position + 1}
-                              </option>
-                            ))}
-                            {["DNC", "DNS", "OCS", "DNF", "DSQ", "DNE"].map((code) => (
-                              <option key={code} value={code}>
-                                {code}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                      ))}
+                      {columns.map((index) => {
+                        const legend = raceCellLegend?.(sailor, index);
+                        return (
+                          <td key={index} className="px-1 py-1.5 text-center align-middle">
+                            <div className="carga-score-cell">
+                              <select
+                                value={canonicalScoreCell(scores[index])}
+                                onChange={(event) => onScore(sailor.id, index, event.target.value)}
+                                className="w-[4.25rem] max-w-full h-9 bg-sea-900 border border-white/10 rounded-lg text-center text-[12px] font-bold tabular-nums"
+                              >
+                                <option value="">—</option>
+                                {Array.from({ length: 30 }, (_, position) => (
+                                  <option key={position + 1} value={String(position + 1)}>
+                                    {position + 1}
+                                  </option>
+                                ))}
+                                {COMMISSION_PENALTY_OPTIONS.map(({ value, label }) => (
+                                  <option key={value} value={value}>
+                                    {label}
+                                  </option>
+                                ))}
+                              </select>
+                              {legend?.includes("(desc.)") ? <ScoreCellLegend text={legend} /> : null}
+                            </div>
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
                 })

@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useChampionship } from "../../app/championship-context";
-import { downloadDoc } from "../../data/download-doc";
 import {
   categoriesForClass,
   classNames,
@@ -12,9 +11,11 @@ import {
   sailorsInFecha
 } from "../../domain/model";
 import { InscripcionView, type InscripcionDraft } from "./Inscripcion.view";
+import { useConfirm } from "../../ui/confirm";
 
 export function Inscripcion() {
   const api = useChampionship();
+  const confirm = useConfirm();
   const event = currentEvent(api.state);
   const classes = classNames(api.state);
   const [draft, setDraft] = useState<InscripcionDraft>(() => ({
@@ -93,18 +94,18 @@ export function Inscripcion() {
         setDraft((current) => ({ ...current, ...patch }));
       }}
       onSubmit={onSubmit}
-      onDownload={(kind) => {
-        const doc = event?.[kind];
-        if (!downloadDoc(doc, kind === "ar" ? "AR.pdf" : "IR.pdf")) {
-          api.showToast("No hay archivo cargado");
-        }
-      }}
-      onDelete={(id) => {
+      onDelete={async (id) => {
         if (!api.isAdmin) {
           api.deleteSailor(id);
           return;
         }
-        if (!window.confirm("¿Eliminar este inscripto?")) return;
+        const ok = await confirm({
+          title: "Eliminar inscripto",
+          message: "Se quita a esta persona de la lista. Podés volver a inscribirla después.",
+          confirmLabel: "Eliminar",
+          danger: true
+        });
+        if (!ok) return;
         api.deleteSailor(id);
       }}
     />

@@ -22,7 +22,6 @@ export function InscripcionView({
   sailors,
   onChange,
   onSubmit,
-  onDownload,
   onDelete
 }: {
   draft: InscripcionDraft;
@@ -35,8 +34,7 @@ export function InscripcionView({
   sailors: { sailor: Sailor; fechas: string }[];
   onChange: (patch: Partial<InscripcionDraft>) => void;
   onSubmit: (event: FormEvent) => void;
-  onDownload: (kind: "ar" | "ir") => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | Promise<void>;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const previousCount = useRef(sailors.length);
@@ -50,32 +48,7 @@ export function InscripcionView({
   }, [sailors.length]);
 
   return (
-    <div className="inscripcion-layout space-y-3 lg:space-y-0 lg:gap-5">
-      <Card className="space-y-2 text-sm lg:sticky lg:top-3 lg:self-start">
-        {brief ? (
-          <>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Próxima / seleccionada</p>
-              <h3 className="font-bold">{brief.name}</h3>
-              <p className="text-slate-300">
-                {brief.date ? formatBriefDay(brief.date) : "Día a confirmar"} · {brief.time || ""} hs
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => onDownload("ar")} className="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold">
-                Descargar AR
-              </button>
-              <button type="button" onClick={() => onDownload("ir")} className="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold">
-                Descargar IR
-              </button>
-            </div>
-          </>
-        ) : (
-          <p className="text-slate-400 text-sm">Todavía no hay fechas del campeonato.</p>
-        )}
-      </Card>
-
-      <div className="inscripcion-layout-main space-y-3 min-w-0">
+    <div className="inscripcion-layout space-y-3 min-w-0">
       {canRegister ? (
       <form onSubmit={onSubmit} className="bg-sea-800 rounded-2xl p-4 lg:p-5 border border-white/10 space-y-3 shadow-lg">
         <div className="flex items-center justify-between">
@@ -171,7 +144,9 @@ export function InscripcionView({
             puede inscribir si hace falta.
           </p>
           {!isAdmin && brief?.date ? (
-            <p className="text-[11px] text-slate-500">Regata: {formatBriefDay(brief.date)}</p>
+            <p className="text-[11px] text-slate-500">
+              Regata: {brief.date.split("-").reverse().join("/")}
+            </p>
           ) : null}
         </Card>
       )}
@@ -211,12 +186,6 @@ export function InscripcionView({
           )}
         </div>
       </Card>
-      </div>
     </div>
   );
-}
-
-function formatBriefDay(iso: string) {
-  const [year, month, day] = iso.split("-");
-  return `${day}/${month}/${year}`;
 }

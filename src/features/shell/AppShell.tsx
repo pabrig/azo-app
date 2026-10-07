@@ -1,6 +1,9 @@
 import { useChampionship } from "../../app/championship-context";
 import { isDevHost } from "../../app/dev-host";
 import { CanalOficial } from "../canal/CanalOficial";
+import { downloadDoc } from "../../data/download-doc";
+import { currentEvent } from "../../domain/model";
+import { FechaBriefCard } from "../fecha/FechaBriefCard";
 import { Carga } from "../carga/Carga";
 import { Fechas } from "../fechas/Fechas";
 import { Inscripcion } from "../inscripcion/Inscripcion";
@@ -10,6 +13,7 @@ import { AppShellView } from "./AppShell.view";
 
 export function AppShell() {
   const api = useChampionship();
+  const event = currentEvent(api.state);
   return (
     <AppShellView
       sync={api.sync}
@@ -24,6 +28,17 @@ export function AppShell() {
       onLogout={api.logoutCommission}
       onTab={api.setTab}
       canal={<CanalOficial />}
+      fechaBrief={
+        <FechaBriefCard
+          event={event}
+          onDownload={(kind) => {
+            const doc = event?.[kind];
+            if (!downloadDoc(doc, kind === "ar" ? "AR.pdf" : "IR.pdf")) {
+              api.showToast("No hay archivo cargado");
+            }
+          }}
+        />
+      }
     >
       {api.tab === "inscripcion" ? <Inscripcion /> : null}
       {api.tab === "fechas" ? <Fechas /> : null}
