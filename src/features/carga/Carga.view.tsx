@@ -87,6 +87,8 @@ export function CargaView({
         </div>
         <p className="carga-layout__hint text-[10px] lg:text-xs text-slate-500 leading-relaxed">
           Puesto 1–30 o penalización (p. ej. Descalificado = DSQ; no se descarta del neto).
+          Si hay un error, corregí el resultado aunque la fecha ya se haya corrido: placa y ranking se actualizan al
+          momento.
         </p>
         <div className="carga-layout__table min-w-0">
       {hasEvent ? (

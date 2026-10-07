@@ -8,6 +8,8 @@ export type InscripcionDraft = {
   name: string;
   category: string;
   club: string;
+  celular: string;
+  dni: string;
   fecha: string;
 };
 
@@ -113,6 +115,29 @@ export function InscripcionView({
             />
           </Field>
         </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Field label="Celular">
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="11 1234-5678"
+              value={draft.celular}
+              onChange={(event) => onChange({ celular: event.target.value })}
+              className={controlClass}
+            />
+          </Field>
+          <Field label="DNI">
+            <input
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="12345678"
+              value={draft.dni}
+              onChange={(event) => onChange({ dni: event.target.value })}
+              className={controlClass}
+            />
+          </Field>
+        </div>
         <Field label="Fecha *">
           <select
             required
@@ -171,6 +196,13 @@ export function InscripcionView({
                     <p className="text-[10px] text-slate-400">
                       {sailor.boatClass} · {sailor.category} · {sailor.club}
                     </p>
+                    {isAdmin && (sailor.celular || sailor.dni) ? (
+                      <p className="text-[10px] text-slate-500">
+                        {[sailor.dni ? `DNI ${sailor.dni}` : null, sailor.celular]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    ) : null}
                     <p className="text-[10px] text-cyan-400/80">{fechaText}</p>
                   </div>
                 </div>

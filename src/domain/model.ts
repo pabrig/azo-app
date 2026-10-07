@@ -155,6 +155,74 @@ export function suggestNextFechaName(events: Fecha[]) {
   return `Fecha ${index}`;
 }
 
+function cloneScoreRow(row: Array<string | null> | undefined) {
+  return row ? [...row] : [];
+}
+
+function fillScoreRow(
+  base: Array<string | null> | undefined,
+  incoming: Array<string | null> | undefined,
+  overwrite: boolean
+) {
+  const row = cloneScoreRow(base);
+  (incoming || []).forEach((cell, index) => {
+    if (cell == null || cell === "") {
+      if (row[index] === undefined) row[index] = null;
+      return;
+    }
+    if (overwrite || row[index] == null || row[index] === "") row[index] = cell;
+  });
+  return row;
+}
+
+/** Une resultados por timonel: gana el `scoreAt` más reciente (correcciones de comisión). */
+export function mergeScoreBooks(
+  leftScores: Fecha["scores"] | undefined,
+  leftAt: Record<string, number> | undefined,
+  rightScores: Fecha["scores"] | undefined,
+  rightAt: Record<string, number> | undefined,
+  mapId: (id: string) => string = (id) => id
+): { scores: Fecha["scores"]; scoreAt: Record<string, number> } {
+  type Side = { row?: Array<string | null>; at: number };
+  const sides = new Map<string, { left: Side; right: Side }>();
+
+  const take = (
+    scores: Fecha["scores"] | undefined,
+    atMap: Record<string, number> | undefined,
+    which: "left" | "right"
+  ) => {
+    Object.entries(scores || {}).forEach(([id, row]) => {
+      const key = mapId(id);
+      const at = atMap?.[id] || atMap?.[key] || 0;
+      const entry = sides.get(key) || { left: { at: 0 }, right: { at: 0 } };
+      if (!entry[which].row || at >= entry[which].at) {
+        entry[which] = { row, at };
+      }
+      sides.set(key, entry);
+    });
+  };
+
+  take(leftScores, leftAt, "left");
+  take(rightScores, rightAt, "right");
+
+  const scores: Fecha["scores"] = {};
+  const scoreAt: Record<string, number> = {};
+  for (const [key, { left, right }] of sides) {
+    if ((right.at || 0) > (left.at || 0)) {
+      if (right.row) scores[key] = cloneScoreRow(right.row);
+      if (right.at) scoreAt[key] = right.at;
+    } else if ((left.at || 0) > (right.at || 0)) {
+      if (left.row) scores[key] = cloneScoreRow(left.row);
+      if (left.at) scoreAt[key] = left.at;
+    } else {
+      scores[key] = fillScoreRow(left.row, right.row, true);
+      const at = Math.max(left.at || 0, right.at || 0);
+      if (at) scoreAt[key] = at;
+    }
+  }
+  return { scores, scoreAt };
+}
+
 function mergeFechaRecords(a: Fecha, b: Fecha): Fecha {
   const aAt = a.updatedAt || 0;
   const bAt = b.updatedAt || 0;
@@ -173,11 +241,11 @@ function mergeFechaRecords(a: Fecha, b: Fecha): Fecha {
     winner = b;
     loser = a;
   }
-  const scoreAt = { ...(loser.scoreAt || {}), ...(winner.scoreAt || {}) };
+  const { scores, scoreAt } = mergeScoreBooks(loser.scores, loser.scoreAt, winner.scores, winner.scoreAt);
   return {
     ...winner,
     racesCount: Math.max(winner.racesCount || 0, loser.racesCount || 0),
-    scores: { ...loser.scores, ...winner.scores },
+    scores,
     ...(Object.keys(scoreAt).length ? { scoreAt } : {})
   };
 }

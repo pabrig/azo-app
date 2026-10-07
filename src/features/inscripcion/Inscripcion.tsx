@@ -24,6 +24,8 @@ export function Inscripcion() {
     name: "",
     category: "General",
     club: "",
+    celular: "",
+    dni: "",
     fecha: api.state.fecha
   }));
 
@@ -61,9 +63,11 @@ export function Inscripcion() {
       name: draft.name,
       category: draft.category,
       club: draft.club,
+      celular: draft.celular,
+      dni: draft.dni,
       fecha: draft.fecha
     });
-    setDraft((current) => ({ ...current, sailNumber: "", name: "", club: "" }));
+    setDraft((current) => ({ ...current, sailNumber: "", name: "", club: "", celular: "", dni: "" }));
   }
 
   const sailors = event

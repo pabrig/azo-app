@@ -5,6 +5,7 @@ import {
   boatClasses,
   compactDuplicateFechas,
   defaultState,
+  mergeScoreBooks,
   migrateClasses,
   migrateEvents,
   officialWhatsApp,
@@ -294,6 +295,10 @@ function canonicalSailors(sailors: Sailor[]) {
         category: sailor.category,
         club: sailor.club
       };
+      const celular = sailor.celular?.trim();
+      const dni = sailor.dni?.trim();
+      if (celular) packed.celular = celular;
+      if (dni) packed.dni = dni;
       if (sailor.fechas?.length) packed.fechas = [...sailor.fechas].sort();
       if (sailor.updatedAt) packed.updatedAt = sailor.updatedAt;
       return packed;
@@ -364,10 +369,14 @@ function mergeSailors(
     const loser = incomingWins ? existing : sailor;
     if (loser.id !== winner.id) idMap.set(loser.id, winner.id);
     const fechas = [...new Set([...(existing.fechas || []), ...(sailor.fechas || [])])];
+    const celular = winner.celular?.trim() || loser.celular?.trim();
+    const dni = winner.dni?.trim() || loser.dni?.trim();
     byKey.set(key, {
       ...winner,
       sailNumber: winner.sailNumber.trim().toUpperCase(),
       fechas: fechas.length ? fechas : winner.fechas,
+      celular: celular || undefined,
+      dni: dni || undefined,
       updatedAt: Math.max(existingAt, at) || undefined
     });
   }
@@ -393,36 +402,24 @@ function canonId(id: string, idMap: Map<string, string>) {
   return next;
 }
 
-function mergeScoreRows(
-  base: Array<string | null> | undefined,
-  incoming: Array<string | null> | undefined,
-  overwrite: boolean
-) {
-  const row = base ? [...base] : [];
-  (incoming || []).forEach((cell, index) => {
-    if (cell == null || cell === "") {
-      if (row[index] === undefined) row[index] = null;
-      return;
-    }
-    if (overwrite || row[index] == null || row[index] === "") row[index] = cell;
-  });
-  return row;
-}
-
-function mergeScores(
-  local: Fecha["scores"],
-  remote: Fecha["scores"],
+function withMergedScores(
+  event: Fecha,
+  local: Fecha | undefined,
+  remote: Fecha | undefined,
   idMap: Map<string, string>
-) {
-  const out: Fecha["scores"] = {};
-  const put = (id: string, row: Array<string | null> | undefined, overwrite: boolean) => {
-    if (!row) return;
-    const key = canonId(id, idMap);
-    out[key] = mergeScoreRows(out[key], row, overwrite);
+): Fecha {
+  const book = mergeScoreBooks(
+    local?.scores,
+    local?.scoreAt,
+    remote?.scores,
+    remote?.scoreAt,
+    (id) => canonId(id, idMap)
+  );
+  return {
+    ...event,
+    scores: book.scores,
+    ...(Object.keys(book.scoreAt).length ? { scoreAt: book.scoreAt } : {})
   };
-  Object.entries(local || {}).forEach(([id, row]) => put(id, row, false));
-  Object.entries(remote || {}).forEach(([id, row]) => put(id, row, true));
-  return out;
 }
 
 function mergeEvents(
@@ -433,26 +430,31 @@ function mergeEvents(
 ) {
   const map = new Map<string, Fecha>();
   for (const event of local) {
-    map.set(event.id, { ...event, scores: mergeScores(event.scores, {}, idMap) });
+    map.set(event.id, withMergedScores(event, event, undefined, idMap));
   }
   for (const event of remote) {
     const previous = map.get(event.id);
     if (!previous) {
-      map.set(event.id, { ...event, scores: mergeScores({}, event.scores, idMap) });
+      map.set(event.id, withMergedScores(event, undefined, event, idMap));
       continue;
     }
     const localAt = previous.updatedAt || 0;
     const remoteAt = event.updatedAt || 0;
     const winner = remoteAt >= localAt ? event : previous;
     const loser = winner === event ? previous : event;
-    const scoreAt = { ...(previous.scoreAt || {}), ...(event.scoreAt || {}) };
-    map.set(event.id, {
-      ...loser,
-      ...winner,
-      racesCount: Math.max(previous.racesCount || 0, event.racesCount || 0),
-      scores: mergeScores(previous.scores, event.scores, idMap),
-      ...(Object.keys(scoreAt).length ? { scoreAt } : {})
-    });
+    map.set(
+      event.id,
+      withMergedScores(
+        {
+          ...loser,
+          ...winner,
+          racesCount: Math.max(previous.racesCount || 0, event.racesCount || 0)
+        },
+        previous,
+        event,
+        idMap
+      )
+    );
   }
   return finalizeEvents([...map.values()], removedFechas);
 }

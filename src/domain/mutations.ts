@@ -21,6 +21,26 @@ export function selectClassFilter(state: ChampionshipState, classFilter: string)
   return { ...state, classFilter };
 }
 
+function optionalCelular(value: string | undefined) {
+  return value?.trim() || undefined;
+}
+
+function optionalDni(value: string | undefined) {
+  const trimmed = value?.trim() || "";
+  if (!trimmed) return undefined;
+  const digits = trimmed.replace(/\D/g, "");
+  return digits || trimmed;
+}
+
+function contactFromInput(input: RegisterInput, existing?: { celular?: string; dni?: string }) {
+  const celular = optionalCelular(input.celular) || optionalCelular(existing?.celular);
+  const dni = optionalDni(input.dni) || optionalDni(existing?.dni);
+  return {
+    ...(celular ? { celular } : {}),
+    ...(dni ? { dni } : {})
+  };
+}
+
 export function registerSailor(state: ChampionshipState, input: RegisterInput): { state: ChampionshipState; toast: string } {
   const sailNumber = input.sailNumber.trim().toUpperCase();
   const name = input.name.trim();
@@ -32,6 +52,7 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
   if (existing) {
     const fechas = sailorFechas(existing, state.events);
     const nextFechas = fechas.includes(input.fecha) ? fechas.slice() : [...fechas, input.fecha];
+    const contact = contactFromInput(input, existing);
     return {
       state: selectFecha(
         {
@@ -46,6 +67,8 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
                   name,
                   category: input.category,
                   club,
+                  celular: contact.celular,
+                  dni: contact.dni,
                   fechas: nextFechas,
                   updatedAt
                 }
@@ -57,6 +80,7 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
       toast: `Inscripto en ${label(state, input.fecha)}`
     };
   }
+  const contact = contactFromInput(input);
   return {
     state: selectFecha(
       {
@@ -71,6 +95,7 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
             name,
             category: input.category,
             club,
+            ...contact,
             fechas: [input.fecha],
             updatedAt
           }
@@ -168,10 +193,12 @@ export function updateScore(
       const previous = event.scores[sailorId] ? [...event.scores[sailorId]] : [];
       previous[raceIdx] =
         value === "" ? null : normalizeScoreEntry(value) ?? value.trim().toUpperCase();
+      const now = Date.now();
       return {
         ...event,
         scores: { ...event.scores, [sailorId]: previous },
-        scoreAt: { ...(event.scoreAt || {}), [sailorId]: Date.now() }
+        scoreAt: { ...(event.scoreAt || {}), [sailorId]: now },
+        updatedAt: now
       };
     })
   };

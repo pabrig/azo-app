@@ -44,6 +44,8 @@ export type Sailor = {
   name: string;
   category: string;
   club: string;
+  celular?: string;
+  dni?: string;
   fechas?: string[];
   updatedAt?: number;
 };
@@ -94,6 +96,8 @@ export type RegisterInput = {
   name: string;
   category: string;
   club: string;
+  celular?: string;
+  dni?: string;
   fecha: string;
 };
 

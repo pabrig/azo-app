@@ -560,6 +560,47 @@ describe("fechas y clases heredadas", () => {
     expect(state.events[0].scores.s1).toEqual(["4"]);
     expect(state.events[0].racesCount).toBe(3);
   });
+
+  it("la comisión puede corregir un resultado de una fecha ya corrida y queda en placa, ranking y sync", () => {
+    let state = defaultState();
+    const fechaId = state.events[0].id;
+    state.events[0] = { ...state.events[0], date: "2020-01-01", racesCount: 1 };
+    state.sailors = [
+      {
+        id: "a",
+        sailNumber: "1",
+        boatClass: "ILCA 6",
+        name: "Ana",
+        category: "General",
+        club: "CNA",
+        fechas: [fechaId]
+      }
+    ];
+    state = updateScore({ ...state, fecha: fechaId }, "a", 0, "5");
+    expect(rankedForFecha(state, fechaId)[0].net).toBe(5);
+
+    const staleCloud = {
+      sailors: cloudRow(state).sailors,
+      events: cloudPayload({
+        ...state,
+        events: state.events.map((event) =>
+          event.id === fechaId
+            ? { ...event, scores: { a: ["5"] }, scoreAt: { a: 1 }, updatedAt: 1 }
+            : event
+        )
+      }).events
+    };
+
+    state = updateScore(state, "a", 0, "1");
+    expect(state.events[0].scores.a?.[0]).toBe("1");
+    expect(rankedForFecha(state, fechaId)[0].net).toBe(1);
+    expect(rankedOverall(state)[0].net).toBe(1);
+
+    const merged = mergeRemote(state, staleCloud);
+    expect(merged.events[0].scores.a?.[0]).toBe("1");
+    expect(rankedForFecha(merged, fechaId)[0].net).toBe(1);
+    expect(rankedOverall(merged)[0].net).toBe(1);
+  });
 });
 
 function sailor(partial: Partial<Sailor> & Pick<Sailor, "id" | "sailNumber" | "name">): Sailor {
@@ -720,6 +761,41 @@ describe("inscripciones de varios dispositivos", () => {
     const removed = removeSailor(state, ana!.id);
     const otherPhone = mergeRemote(state, cloudRow(removed));
     expect(otherPhone.sailors.map((item) => item.name)).toEqual(["Beto"]);
+  });
+
+  it("guarda celular y DNI opcionales y los replica en el payload de Appwrite", () => {
+    let state = defaultState();
+    const fecha = state.events[0].id;
+    state = registerSailor(state, {
+      sailNumber: "ARG 1",
+      boatClass: "ILCA 6",
+      name: "Ana Gómez",
+      category: "General",
+      club: "CNA",
+      celular: "11 5555-1212",
+      dni: "12.345.678",
+      fecha
+    }).state;
+    expect(state.sailors[0]).toMatchObject({ celular: "11 5555-1212", dni: "12345678" });
+    const packed = JSON.parse(cloudRow(state).sailors as string) as Sailor[];
+    expect(packed[0]).toMatchObject({ celular: "11 5555-1212", dni: "12345678" });
+
+    state = registerSailor(state, {
+      sailNumber: "ARG 1",
+      boatClass: "ILCA 6",
+      name: "Ana Gómez",
+      category: "General",
+      club: "CNA",
+      fecha
+    }).state;
+    expect(state.sailors[0]).toMatchObject({ celular: "11 5555-1212", dni: "12345678" });
+
+    const otherPhone = defaultState();
+    otherPhone.sailors = [
+      sailor({ id: state.sailors[0].id, sailNumber: "ARG 1", name: "Ana Gómez", updatedAt: 1 })
+    ];
+    const merged = mergeRemote(otherPhone, cloudRow(state));
+    expect(merged.sailors[0]).toMatchObject({ celular: "11 5555-1212", dni: "12345678" });
   });
 
   it("registra la hora de la inscripción y la baja", () => {
