@@ -1,6 +1,6 @@
 import { Client } from "appwrite";
 import { CHAMP_ID, config } from "../config";
-import { cloudPayload, cloudView, syncFingerprint } from "../domain/cloud";
+import { cloudPayload, cloudView, hasCloudChampionship, mergeRemote, syncFingerprint } from "../domain/cloud";
 import type { ChampionshipState } from "../domain/types";
 import type { SyncMode } from "../domain/types";
 
@@ -29,6 +29,7 @@ function isNotFound(error: unknown) {
 export function createCloudSync(options: {
   getState: () => ChampionshipState;
   applyRemote: (row: unknown) => void;
+  applyState: (state: ChampionshipState) => void;
   onStatus: (mode: SyncMode, label: string) => void;
 }): CloudSync {
   let ready = false;
@@ -89,13 +90,17 @@ export function createCloudSync(options: {
 
   /** Une con la última versión de la nube antes de escribir, para no pisar a otro celular. */
   async function writeMerged() {
+    const pending = options.getState();
+    let next = pending;
     try {
       const latest = await request("GET", rowPath(CHAMP_ID));
-      if (disposed) return;
-      options.applyRemote(latest);
-      if (syncFingerprint(options.getState()) === syncFingerprint(cloudView(latest))) {
-        options.onStatus("live", "Appwrite");
-        return;
+      if (hasCloudChampionship(latest)) {
+        next = mergeRemote(pending, latest);
+        if (syncFingerprint(next) === syncFingerprint(cloudView(latest))) {
+          options.applyState(next);
+          options.onStatus("live", "Appwrite");
+          return;
+        }
       }
     } catch (error) {
       if (!isNotFound(error)) {
@@ -104,7 +109,8 @@ export function createCloudSync(options: {
         return;
       }
     }
-    const data = cloudPayload(options.getState());
+    options.applyState(next);
+    const data = cloudPayload(next);
     try {
       await request("PATCH", rowPath(CHAMP_ID), { data });
       if (!disposed) options.onStatus("live", "Appwrite");
@@ -158,6 +164,7 @@ export function createCloudSync(options: {
   window.addEventListener("pagehide", flush);
 
   function absorb(row: unknown) {
+    if (!hasCloudChampionship(row)) return;
     options.applyRemote(row);
     if (!disposed && syncFingerprint(options.getState()) !== syncFingerprint(cloudView(row))) {
       schedule();

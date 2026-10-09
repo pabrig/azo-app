@@ -1,5 +1,17 @@
-import { bundledDoc, defaultBoatClasses, DEFAULT_AVISOS, DEFAULT_WHATSAPP } from "./defaults";
-import type { BoatClass, ChampionshipState, Fecha, RemovedFecha, Sailor } from "./types";
+import {
+  bundledDoc,
+  DEFAULT_CLASS_CATEGORIES,
+  defaultBoatClasses,
+  DEFAULT_AVISOS,
+  DEFAULT_WHATSAPP,
+  migrateClassCategories
+} from "./defaults";
+import { canonicalBoatClassName, sameBoatClass } from "./class-names";
+import { applyCanonicalClassNames } from "./migrate-championship";
+import { clampRacesCount, sliceScoreBook } from "./race-slots";
+import type { BoatClass, ChampionshipState, Fecha, RaceDoc, RemovedFecha, Sailor } from "./types";
+
+export { canonicalBoatClassName, sameBoatClass } from "./class-names";
 
 export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11,7 +23,37 @@ export function formatDay(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
+/** Fecha local YYYY-MM-DD (inscripciones usan calendario del dispositivo). */
+export function todayLocalIso(now = new Date()) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Timoneles no pueden inscribirse si el día de regata ya pasó (mismo día aún permitido). */
+export function isFechaRegistrationClosed(fecha: Fecha, todayIso = todayLocalIso()) {
+  const day = fecha.date?.trim();
+  if (!day) return false;
+  return day < todayIso;
+}
+
+/** Descarte por defecto del campeonato (3+ regatas → 1, como placa oficial). */
+export function defaultDiscardsAllowed(racesCount: number) {
+  return racesCount >= 3 ? 1 : 0;
+}
+
+function resolveDiscardsAllowed(partial: Partial<Fecha>, racesCount: number) {
+  const max = Math.max(0, racesCount - 1);
+  if (typeof partial.discardsAllowed === "number" && Number.isFinite(partial.discardsAllowed)) {
+    return Math.min(Math.max(0, Math.floor(partial.discardsAllowed)), max);
+  }
+  return defaultDiscardsAllowed(racesCount);
+}
+
 export function makeFecha(partial: Partial<Fecha> = {}): Fecha {
+  const racesCount = clampRacesCount(partial.racesCount);
+  const scores = sliceScoreBook(partial.scores || {}, racesCount);
   return {
     id: partial.id || uid(),
     name: partial.name || "Nueva fecha",
@@ -20,8 +62,9 @@ export function makeFecha(partial: Partial<Fecha> = {}): Fecha {
     avisos: partial.avisos || DEFAULT_AVISOS,
     ar: bundledDoc(partial.ar, "ar"),
     ir: bundledDoc(partial.ir, "ir"),
-    racesCount: partial.racesCount || 3,
-    scores: partial.scores || {},
+    racesCount,
+    discardsAllowed: resolveDiscardsAllowed(partial, racesCount),
+    scores,
     ...(partial.updatedAt ? { updatedAt: partial.updatedAt } : {}),
     ...(partial.scoreAt && Object.keys(partial.scoreAt).length ? { scoreAt: partial.scoreAt } : {})
   };
@@ -63,16 +106,19 @@ export function migrateClasses(raw: unknown): BoatClass[] {
     .map((item) => {
       if (typeof item === "string") {
         const known = DEFAULT_BOAT_CLASSES_LOOKUP(item);
-        return { name: item, categories: known ? known.slice() : ["General"] };
+        return {
+          name: item,
+          categories: migrateClassCategories(known ? known.slice() : [...DEFAULT_CLASS_CATEGORIES])
+        };
       }
-      if (!item || typeof item !== "object") return { name: "", categories: ["General"] };
+      if (!item || typeof item !== "object") return { name: "", categories: [...DEFAULT_CLASS_CATEGORIES] };
       const record = item as { name?: unknown; categories?: unknown };
       const categories = Array.isArray(record.categories)
         ? record.categories.map((value) => String(value).trim()).filter(Boolean)
         : [];
       return {
         name: String(record.name || "").trim(),
-        categories: categories.length ? categories : ["General"]
+        categories: migrateClassCategories(categories)
       };
     })
     .filter((item) => item.name);
@@ -110,6 +156,88 @@ export function suggestNextFechaName(events: Fecha[]) {
   return `Fecha ${index}`;
 }
 
+function cloneScoreRow(row: Array<string | null> | undefined) {
+  return row ? [...row] : [];
+}
+
+function fillScoreRow(
+  base: Array<string | null> | undefined,
+  incoming: Array<string | null> | undefined,
+  overwrite: boolean
+) {
+  const row = cloneScoreRow(base);
+  (incoming || []).forEach((cell, index) => {
+    if (cell == null || cell === "") {
+      if (row[index] === undefined) row[index] = null;
+      return;
+    }
+    if (overwrite || row[index] == null || row[index] === "") row[index] = cell;
+  });
+  return row;
+}
+
+/** Une resultados por timonel: gana el `scoreAt` más reciente (correcciones de comisión). */
+export function mergeScoreBooks(
+  leftScores: Fecha["scores"] | undefined,
+  leftAt: Record<string, number> | undefined,
+  rightScores: Fecha["scores"] | undefined,
+  rightAt: Record<string, number> | undefined,
+  mapId: (id: string) => string = (id) => id
+): { scores: Fecha["scores"]; scoreAt: Record<string, number> } {
+  type Side = { row?: Array<string | null>; at: number };
+  const sides = new Map<string, { left: Side; right: Side }>();
+
+  const take = (
+    scores: Fecha["scores"] | undefined,
+    atMap: Record<string, number> | undefined,
+    which: "left" | "right"
+  ) => {
+    Object.entries(scores || {}).forEach(([id, row]) => {
+      const key = mapId(id);
+      const at = atMap?.[id] || atMap?.[key] || 0;
+      const entry = sides.get(key) || { left: { at: 0 }, right: { at: 0 } };
+      if (!entry[which].row || at >= entry[which].at) {
+        entry[which] = { row, at };
+      }
+      sides.set(key, entry);
+    });
+  };
+
+  take(leftScores, leftAt, "left");
+  take(rightScores, rightAt, "right");
+
+  const scores: Fecha["scores"] = {};
+  const scoreAt: Record<string, number> = {};
+  for (const [key, { left, right }] of sides) {
+    if ((right.at || 0) > (left.at || 0)) {
+      if (right.row) scores[key] = cloneScoreRow(right.row);
+      if (right.at) scoreAt[key] = right.at;
+    } else if ((left.at || 0) > (right.at || 0)) {
+      if (left.row) scores[key] = cloneScoreRow(left.row);
+      if (left.at) scoreAt[key] = left.at;
+    } else {
+      scores[key] = fillScoreRow(left.row, right.row, true);
+      const at = Math.max(left.at || 0, right.at || 0);
+      if (at) scoreAt[key] = at;
+    }
+  }
+  return { scores, scoreAt };
+}
+
+/** Un PDF subido no se pierde si el otro lado solo trae el nombre/href. */
+export function mergeRaceDoc(winner: RaceDoc | undefined, loser: RaceDoc | undefined): RaceDoc {
+  if (winner?.dataUrl) return winner;
+  if (loser?.dataUrl) {
+    return {
+      ...loser,
+      ...winner,
+      dataUrl: loser.dataUrl,
+      name: winner?.name || loser.name
+    };
+  }
+  return winner || loser || { name: "" };
+}
+
 function mergeFechaRecords(a: Fecha, b: Fecha): Fecha {
   const aAt = a.updatedAt || 0;
   const bAt = b.updatedAt || 0;
@@ -128,11 +256,15 @@ function mergeFechaRecords(a: Fecha, b: Fecha): Fecha {
     winner = b;
     loser = a;
   }
-  const scoreAt = { ...(loser.scoreAt || {}), ...(winner.scoreAt || {}) };
+  const { scores, scoreAt } = mergeScoreBooks(loser.scores, loser.scoreAt, winner.scores, winner.scoreAt);
   return {
+    ...loser,
     ...winner,
-    racesCount: Math.max(winner.racesCount || 0, loser.racesCount || 0),
-    scores: { ...loser.scores, ...winner.scores },
+    ar: mergeRaceDoc(winner.ar, loser.ar),
+    ir: mergeRaceDoc(winner.ir, loser.ir),
+    scores,
+    racesCount: winner.racesCount,
+    discardsAllowed: winner.discardsAllowed,
     ...(Object.keys(scoreAt).length ? { scoreAt } : {})
   };
 }
@@ -194,8 +326,11 @@ export function classNames(state: ChampionshipState) {
 }
 
 export function effectiveClassFilter(state: ChampionshipState) {
-  if (state.classFilter !== "ALL" && !classNames(state).includes(state.classFilter)) return "ALL";
-  return state.classFilter;
+  if (state.classFilter === "ALL") return "ALL";
+  const filter = canonicalBoatClassName(state.classFilter);
+  const names = classNames(state);
+  if (!names.some((name) => sameBoatClass(name, filter))) return "ALL";
+  return names.find((name) => sameBoatClass(name, filter)) || filter;
 }
 
 export function currentEvent(state: ChampionshipState): Fecha | null {
@@ -221,7 +356,7 @@ export function filteredSailors(state: ChampionshipState, fechaKey: string | nul
   const list = fechaKey ? sailorsInFecha(state, fechaKey) : state.sailors.slice();
   const filter = effectiveClassFilter(state);
   if (filter === "ALL") return list;
-  return list.filter((sailor) => sailor.boatClass === filter);
+  return list.filter((sailor) => sameBoatClass(sailor.boatClass, filter));
 }
 
 export function officialWhatsApp(state: ChampionshipState) {
@@ -229,8 +364,8 @@ export function officialWhatsApp(state: ChampionshipState) {
 }
 
 export function categoriesForClass(state: ChampionshipState, className: string) {
-  const found = boatClasses(state).find((item) => item.name === className);
-  return found?.categories.length ? found.categories : ["General"];
+  const found = boatClasses(state).find((item) => sameBoatClass(item.name, className));
+  return found?.categories.length ? found.categories : [...DEFAULT_CLASS_CATEGORIES];
 }
 
 export function preferredClassName(state: ChampionshipState) {
@@ -239,12 +374,19 @@ export function preferredClassName(state: ChampionshipState) {
   return names[0] || "";
 }
 
+/** Placa y ranking: nunca “Todas”; si el estado global es ALL, usa la clase preferida. */
+export function resultsClassFilter(state: ChampionshipState) {
+  const filter = effectiveClassFilter(state);
+  if (filter === "ALL") return preferredClassName(state);
+  return filter;
+}
+
 export function normalizeLoadedState(parsed: Partial<ChampionshipState> | null | undefined): ChampionshipState {
   if (!parsed) return defaultState();
   const removedFechas = Array.isArray(parsed.removedFechas) ? parsed.removedFechas : [];
   const events = compactDuplicateFechas(applyRemovedFechas(migrateEvents(parsed.events), removedFechas));
   const fecha = events.some((event) => event.id === parsed.fecha) ? parsed.fecha || "" : events[0]?.id || "";
-  return {
+  return applyCanonicalClassNames({
     ...defaultState(),
     ...parsed,
     sailors: Array.isArray(parsed.sailors) ? parsed.sailors : [],
@@ -257,5 +399,5 @@ export function normalizeLoadedState(parsed: Partial<ChampionshipState> | null |
     removedFechas,
     whatsappAt: typeof parsed.whatsappAt === "number" ? parsed.whatsappAt : 0,
     classesAt: typeof parsed.classesAt === "number" ? parsed.classesAt : 0
-  };
+  });
 }

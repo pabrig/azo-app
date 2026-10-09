@@ -1,3 +1,4 @@
+import { normalizeClassCategories } from "./defaults";
 import {
   boatClasses,
   fechaKey,
@@ -8,7 +9,17 @@ import {
   sailorFechas,
   uid
 } from "./model";
-import type { ChampionshipState, ClassSaveInput, Fecha, FechaSaveInput, RegisterInput } from "./types";
+import { applyRacesCount, clampRacesCount, MAX_RACES } from "./race-slots";
+import { raceIndexesWithResults } from "./scoring";
+import { normalizeScoreEntry } from "./score-entry";
+import type {
+  ChampionshipState,
+  ClassSaveInput,
+  Fecha,
+  FechaSaveInput,
+  RegisterInput,
+  SailorSaveInput
+} from "./types";
 
 export function selectFecha(state: ChampionshipState, id: string): ChampionshipState {
   if (!state.events.some((event) => event.id === id)) return state;
@@ -17,6 +28,29 @@ export function selectFecha(state: ChampionshipState, id: string): ChampionshipS
 
 export function selectClassFilter(state: ChampionshipState, classFilter: string): ChampionshipState {
   return { ...state, classFilter };
+}
+
+function optionalCelular(value: string | undefined) {
+  return value?.trim() || undefined;
+}
+
+function optionalDni(value: string | undefined) {
+  const trimmed = value?.trim() || "";
+  if (!trimmed) return undefined;
+  const digits = trimmed.replace(/\D/g, "");
+  return digits || trimmed;
+}
+
+function contactFromInput(
+  input: { celular?: string; dni?: string },
+  existing?: { celular?: string; dni?: string }
+) {
+  const celular = optionalCelular(input.celular) || optionalCelular(existing?.celular);
+  const dni = optionalDni(input.dni) || optionalDni(existing?.dni);
+  return {
+    ...(celular ? { celular } : {}),
+    ...(dni ? { dni } : {})
+  };
 }
 
 export function registerSailor(state: ChampionshipState, input: RegisterInput): { state: ChampionshipState; toast: string } {
@@ -30,6 +64,7 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
   if (existing) {
     const fechas = sailorFechas(existing, state.events);
     const nextFechas = fechas.includes(input.fecha) ? fechas.slice() : [...fechas, input.fecha];
+    const contact = contactFromInput(input, existing);
     return {
       state: selectFecha(
         {
@@ -44,6 +79,8 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
                   name,
                   category: input.category,
                   club,
+                  celular: contact.celular,
+                  dni: contact.dni,
                   fechas: nextFechas,
                   updatedAt
                 }
@@ -55,6 +92,7 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
       toast: `Inscripto en ${label(state, input.fecha)}`
     };
   }
+  const contact = contactFromInput(input);
   return {
     state: selectFecha(
       {
@@ -69,6 +107,7 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
             name,
             category: input.category,
             club,
+            ...contact,
             fechas: [input.fecha],
             updatedAt
           }
@@ -116,21 +155,60 @@ export function removeSailor(state: ChampionshipState, id: string): Championship
   };
 }
 
+export function updateSailor(
+  state: ChampionshipState,
+  input: SailorSaveInput
+): { state?: ChampionshipState; error?: string } {
+  const existing = state.sailors.find((sailor) => sailor.id === input.id);
+  if (!existing) return { error: "No encontramos a esa persona" };
+  const sailNumber = input.sailNumber.trim().toUpperCase();
+  const name = input.name.trim();
+  if (!sailNumber) return { error: "Falta el número de vela" };
+  if (!name) return { error: "Falta el nombre" };
+  const club = input.club.trim().toUpperCase() || "CNA";
+  const contact = contactFromInput(input, existing);
+  return {
+    state: {
+      ...state,
+      sailors: state.sailors.map((sailor) =>
+        sailor.id === existing.id
+          ? {
+              ...sailor,
+              sailNumber,
+              boatClass: input.boatClass,
+              name,
+              category: input.category,
+              club,
+              celular: contact.celular,
+              dni: contact.dni,
+              updatedAt: Date.now()
+            }
+          : sailor
+      )
+    }
+  };
+}
+
 export function addRace(state: ChampionshipState): ChampionshipState {
   const current = state.events.find((event) => event.id === state.fecha) || state.events[0];
-  if (!current) return state;
+  if (!current || clampRacesCount(current.racesCount) >= MAX_RACES) return state;
   return {
     ...state,
-    events: state.events.map((event) =>
-      event.id === current.id ? { ...event, racesCount: event.racesCount + 1, updatedAt: Date.now() } : event
-    )
+    events: state.events.map((event) => {
+      if (event.id !== current.id) return event;
+      const racesCount = Math.min(MAX_RACES, clampRacesCount(event.racesCount) + 1);
+      const maxDiscards = Math.max(0, racesCount - 1);
+      const discardsAllowed = Math.min(event.discardsAllowed ?? 0, maxDiscards);
+      return { ...event, racesCount, discardsAllowed, updatedAt: Date.now() };
+    })
   };
 }
 
 export function removeRace(state: ChampionshipState): ChampionshipState {
   const current = state.events.find((event) => event.id === state.fecha) || state.events[0];
-  if (!current || current.racesCount <= 1) return state;
-  const racesCount = current.racesCount - 1;
+  const currentCount = current ? clampRacesCount(current.racesCount) : 0;
+  if (!current || currentCount <= 1) return state;
+  const racesCount = currentCount - 1;
   return {
     ...state,
     events: state.events.map((event) => {
@@ -140,8 +218,26 @@ export function removeRace(state: ChampionshipState): ChampionshipState {
         const row = event.scores[sailorId];
         scores[sailorId] = Array.isArray(row) ? row.slice(0, racesCount) : row;
       });
-      return { ...event, racesCount, scores, updatedAt: Date.now() };
+      const maxDiscards = Math.max(0, racesCount - 1);
+      const discardsAllowed = Math.min(event.discardsAllowed ?? 0, maxDiscards);
+      return { ...event, racesCount, discardsAllowed, scores, updatedAt: Date.now() };
     })
+  };
+}
+
+export function setDiscardsAllowed(state: ChampionshipState, count: number): ChampionshipState {
+  const current = state.events.find((event) => event.id === state.fecha) || state.events[0];
+  if (!current) return state;
+  const raced = raceIndexesWithResults(current).length;
+  const slots = clampRacesCount(current.racesCount);
+  const max = Math.max(0, (raced || slots) - 1);
+  const discardsAllowed = Math.min(Math.max(0, Math.floor(count)), max);
+  if (discardsAllowed === current.discardsAllowed) return state;
+  return {
+    ...state,
+    events: state.events.map((event) =>
+      event.id === current.id ? { ...event, discardsAllowed, updatedAt: Date.now() } : event
+    )
   };
 }
 
@@ -158,11 +254,13 @@ export function updateScore(
     events: state.events.map((event) => {
       if (event.id !== current.id) return event;
       const previous = event.scores[sailorId] ? [...event.scores[sailorId]] : [];
-      previous[raceIdx] = value === "" ? null : value;
+      previous[raceIdx] =
+        value === "" ? null : normalizeScoreEntry(value) ?? value.trim().toUpperCase();
+      const now = Date.now();
       return {
         ...event,
         scores: { ...event.scores, [sailorId]: previous },
-        scoreAt: { ...(event.scoreAt || {}), [sailorId]: Date.now() }
+        scoreAt: { ...(event.scoreAt || {}), [sailorId]: now }
       };
     })
   };
@@ -183,21 +281,32 @@ export function saveFecha(
   if (others.some((event) => event.date === input.date)) {
     return { error: "Ya hay una fecha cargada para ese día" };
   }
-  const next = makeFecha({
+  const racesCount = input.racesCount ?? existing?.racesCount;
+  const drafted = makeFecha({
     ...(existing || {}),
     id: existing?.id || uid(),
     name,
     date: input.date,
     time: input.time,
     avisos: input.avisos.trim(),
+    racesCount,
+    discardsAllowed: input.discardsAllowed ?? existing?.discardsAllowed,
     ar: input.ar || existing?.ar,
     ir: input.ir || existing?.ir,
-    updatedAt: Date.now()
+    updatedAt: Math.max(Date.now(), (existing?.updatedAt || 0) + 1)
   });
+  const next = applyRacesCount(drafted, racesCount ?? drafted.racesCount);
   const events = existing
     ? state.events.map((event) =>
         event.id === next.id
-          ? { ...existing, ...next, scores: existing.scores, scoreAt: existing.scoreAt, racesCount: existing.racesCount }
+          ? {
+              ...existing,
+              ...next,
+              scores: next.scores,
+              scoreAt: existing.scoreAt,
+              racesCount: next.racesCount,
+              discardsAllowed: next.discardsAllowed
+            }
           : event
       )
     : [...state.events, next];
@@ -233,7 +342,7 @@ export function saveWhatsapp(state: ChampionshipState, rawUrl: string): { state?
   if (!/chat\.whatsapp\.com/i.test(url)) {
     return { error: "Usá un link de grupo chat.whatsapp.com" };
   }
-  return { state: { ...state, whatsappUrl: url, whatsappAt: Date.now() } };
+  return { state: { ...state, whatsappUrl: url, whatsappAt: Math.max(Date.now(), (state.whatsappAt || 0) + 1) } };
 }
 
 export function saveBoatClass(
@@ -242,8 +351,11 @@ export function saveBoatClass(
 ): { state?: ChampionshipState; error?: string } {
   const name = input.name.trim();
   if (!name) return { error: "Falta el nombre de la clase" };
-  const categories = input.categories.length ? input.categories : ["General"];
-  const list = boatClasses(state).map((item) => ({ ...item, categories: item.categories.slice() }));
+  const categories = normalizeClassCategories(input.categories);
+  const list = (state.classes.length ? state.classes : boatClasses(state)).map((item) => ({
+    ...item,
+    categories: item.categories.slice()
+  }));
   const duplicate = list.find(
     (item) => item.name.toLowerCase() === name.toLowerCase() && item.name !== input.original
   );
@@ -252,17 +364,14 @@ export function saveBoatClass(
   let classFilter = state.classFilter;
   if (input.original) {
     const index = list.findIndex((item) => item.name === input.original);
-    if (index >= 0) {
-      list[index] = { name, categories };
-      if (input.original !== name) {
-        const renamedAt = Date.now();
-        sailors = sailors.map((sailor) =>
-          sailor.boatClass === input.original ? { ...sailor, boatClass: name, updatedAt: renamedAt } : sailor
-        );
-        if (classFilter === input.original) classFilter = name;
-      }
-    } else {
-      list.push({ name, categories });
+    if (index < 0) return { error: "No encontramos esa clase. Tocá Editar de nuevo." };
+    list[index] = { name, categories };
+    if (input.original !== name) {
+      const renamedAt = Date.now();
+      sailors = sailors.map((sailor) =>
+        sailor.boatClass === input.original ? { ...sailor, boatClass: name, updatedAt: renamedAt } : sailor
+      );
+      if (classFilter === input.original) classFilter = name;
     }
   } else {
     list.push({ name, categories });

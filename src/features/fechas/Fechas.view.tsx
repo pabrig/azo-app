@@ -1,4 +1,7 @@
 import type { FormEvent, RefObject } from "react";
+import { DEFAULT_CLASS_CATEGORIES } from "../../domain/defaults";
+import { MAX_RACES } from "../../domain/race-slots";
+import { formatRaceDiscardSummary } from "../../domain/scoring";
 import type { BoatClass, Fecha } from "../../domain/types";
 import { Card, Field, controlClass } from "../../ui/primitives";
 
@@ -8,303 +11,460 @@ export type FechaFormState = {
   date: string;
   time: string;
   avisos: string;
+  racesCount: number;
+  discardsAllowed: number;
 };
 
 export type ClassFormState = {
   original: string;
   name: string;
-  categories: string;
+  categories: string[];
 };
 
 export function FechasView({
   isAdmin,
   classes,
   events,
-  whatsappUrl,
-  whatsappRef,
-  onWhatsappUrl,
-  onSaveWhatsapp,
   classForm,
-  classFormRef,
+  classFormOpen,
   onClassForm,
   onSaveClass,
   onEditClass,
   onDeleteClass,
+  onBeginNewClass,
+  onCancelClassEdit,
+  onToggleCategory,
+  onAddCategory,
   fechaForm,
   fechaFormRef,
-  fechaIsEdit,
+  creatingFecha,
   fileEpoch,
   arHint,
   irHint,
+  maxDiscards,
   onFechaForm,
   onSaveFecha,
-  onResetFecha,
   onBeginNewFecha,
+  onCancelFechaEditor,
   onEditFecha,
   onDeleteFecha,
-  onDownload
+  onDownload,
+  editingFechaId
 }: {
   isAdmin: boolean;
   classes: BoatClass[];
   events: Fecha[];
-  whatsappUrl: string;
-  whatsappRef: RefObject<HTMLInputElement | null>;
-  onWhatsappUrl: (value: string) => void;
-  onSaveWhatsapp: (event: FormEvent) => void;
   classForm: ClassFormState;
-  classFormRef: RefObject<HTMLFormElement | null>;
+  classFormOpen: boolean;
   onClassForm: (patch: Partial<ClassFormState>) => void;
   onSaveClass: (event: FormEvent) => void;
   onEditClass: (name: string) => void;
-  onDeleteClass: (name: string) => void;
+  onDeleteClass: (name: string) => void | Promise<void>;
+  onBeginNewClass: () => void;
+  onCancelClassEdit: () => void;
+  onToggleCategory: (label: string) => void;
+  onAddCategory: (label: string) => void;
   fechaForm: FechaFormState;
   fechaFormRef: RefObject<HTMLFormElement | null>;
-  fechaIsEdit: boolean;
+  creatingFecha: boolean;
   fileEpoch: number;
   arHint: string;
   irHint: string;
+  maxDiscards: number;
   onFechaForm: (patch: Partial<FechaFormState>) => void;
   onSaveFecha: (event: FormEvent<HTMLFormElement>) => void;
-  onResetFecha: () => void;
   onBeginNewFecha: () => void;
+  onCancelFechaEditor: () => void;
   onEditFecha: (id: string) => void;
-  onDeleteFecha: (id: string) => void;
+  onDeleteFecha: (id: string) => void | Promise<void>;
   onDownload: (id: string, kind: "ar" | "ir") => void;
+  editingFechaId: string;
 }) {
+  const classIsEdit = Boolean(classForm.original);
+
   return (
     <div className="space-y-4">
-      <header className="space-y-1">
-        <h1 className="text-lg font-bold tracking-tight">Fechas del campeonato</h1>
-        <p className="text-xs text-slate-400 leading-relaxed">
-          Día, hora, avisos y documentos AR/IR. Los timoneles descargan los PDF desde acá.
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div className="space-y-1 min-w-0">
+          <h1 className="text-lg font-bold tracking-tight">Fechas del campeonato</h1>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Día, hora, regatas, descartes y AR/IR. Placa y ranking solo publican una fecha cuando hay resultados cargados.
+          </p>
+        </div>
+        {isAdmin ? (
+          <button
+            type="button"
+            onClick={onBeginNewFecha}
+            className="shrink-0 bg-cyan-500 text-sea-900 font-bold text-xs px-3 py-2 rounded-xl"
+          >
+            Nueva fecha
+          </button>
+        ) : null}
       </header>
 
-      {classes.length ? (
-        <div className="flex flex-wrap gap-1.5">
-          {classes.map((item) => (
-            <span key={item.name} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/10 text-slate-200">
-              {item.name}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-slate-500">Sin clases definidas todavía.</p>
-      )}
-
-      {isAdmin ? (
-        <Card className="space-y-3 border-2 border-cyan-500/40 bg-cyan-500/5 shadow-lg shadow-cyan-500/5">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">
-                {fechaIsEdit ? "Editar fecha" : "Nueva fecha"}
-              </p>
-              <h2 className="font-bold text-base mt-0.5">
-                {fechaIsEdit ? fechaForm.name || "Fecha seleccionada" : "Agregar una fecha al calendario"}
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Nombre único y un solo registro por día. Podés reemplazar AR e IR si cambian.
-              </p>
-            </div>
-            {fechaIsEdit ? (
-              <button type="button" onClick={onBeginNewFecha} className="shrink-0 text-xs font-semibold bg-cyan-500 text-sea-900 px-3 py-1.5 rounded-lg">
-                + Nueva
-              </button>
-            ) : null}
-          </div>
-          <form ref={fechaFormRef} className="space-y-2.5" onSubmit={onSaveFecha}>
-            <Field label="Nombre *">
-              <input
-                required
-                placeholder="Fecha 2"
-                value={fechaForm.name}
-                onChange={(event) => onFechaForm({ name: event.target.value })}
-                className={controlClass}
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-2.5">
-              <Field label="Día *">
-                <input
-                  type="date"
-                  required
-                  value={fechaForm.date}
-                  onChange={(event) => onFechaForm({ date: event.target.value })}
-                  className={controlClass}
-                />
-              </Field>
-              <Field label="Hora largada *">
-                <input
-                  type="time"
-                  required
-                  value={fechaForm.time}
-                  onChange={(event) => onFechaForm({ time: event.target.value })}
-                  className={controlClass}
-                />
-              </Field>
-            </div>
-            <Field label="Avisos (TOA)">
-              <textarea
-                rows={3}
-                placeholder="Cambios de IR, horario, grupo WhatsApp…"
-                value={fechaForm.avisos}
-                onChange={(event) => onFechaForm({ avisos: event.target.value })}
-                className={controlClass}
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-2.5">
-              <Field label="AR (Aviso de Regata)">
-                <input
-                  key={`ar-${fileEpoch}`}
-                  name="ar"
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  className="mt-1 w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-cyan-500 file:text-sea-900 file:font-bold file:px-2 file:py-1"
-                />
-                <span className="mt-1 block text-[10px] text-slate-500">{arHint}</span>
-              </Field>
-              <Field label="IR (Instrucciones)">
-                <input
-                  key={`ir-${fileEpoch}`}
-                  name="ir"
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  className="mt-1 w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-cyan-500 file:text-sea-900 file:font-bold file:px-2 file:py-1"
-                />
-                <span className="mt-1 block text-[10px] text-slate-500">{irHint}</span>
-              </Field>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button className="flex-1 bg-cyan-500 text-sea-900 font-bold py-3 rounded-xl text-sm">
-                {fechaIsEdit ? "Guardar cambios" : "Crear fecha"}
-              </button>
-              <button type="button" onClick={onResetFecha} className="px-4 bg-white/10 rounded-xl text-sm">
-                Limpiar
-              </button>
-            </div>
-          </form>
-        </Card>
-      ) : (
-        <Card className="text-sm text-slate-400">
-          Para crear o cambiar fechas, clases y canal WhatsApp, ingresá el PIN de comisión (pestaña Carga).
-        </Card>
-      )}
-
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-200">
-          Calendario {events.length ? `(${events.length})` : ""}
-        </h2>
+        {isAdmin && creatingFecha ? (
+          <article className="rounded-2xl p-4 space-y-3 border-2 border-cyan-400 bg-cyan-500/10">
+            <p className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Nueva fecha</p>
+            <form ref={fechaFormRef} className="space-y-2.5" onSubmit={onSaveFecha}>
+              <FechaFields
+                form={fechaForm}
+                fileEpoch={fileEpoch}
+                arHint={arHint}
+                irHint={irHint}
+                maxDiscards={maxDiscards}
+                onChange={onFechaForm}
+              />
+              <div className="flex gap-2 pt-1">
+                <button className="flex-1 bg-cyan-500 text-sea-900 font-bold py-3 rounded-xl text-sm">
+                  Crear fecha
+                </button>
+                <button type="button" onClick={onCancelFechaEditor} className="px-4 bg-white/10 rounded-xl text-sm">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </article>
+        ) : null}
+
         {events.length ? (
-          events.map((event) => (
-            <article key={event.id} className="bg-sea-800/80 rounded-2xl p-4 border border-white/10 space-y-2.5">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-bold">{event.name}</h3>
-                  <p className="text-sm text-cyan-400">
-                    {event.date ? formatDay(event.date) : "Sin día"} · {event.time || "—"} hs
-                  </p>
-                </div>
-                {isAdmin ? (
-                  <div className="flex gap-1 shrink-0">
-                    <button type="button" onClick={() => onEditFecha(event.id)} className="text-xs bg-white/10 px-2 py-1 rounded-lg">
-                      Editar
-                    </button>
-                    <button type="button" onClick={() => onDeleteFecha(event.id)} className="text-xs text-red-300 px-2 py-1">
-                      Borrar
-                    </button>
+          events.map((event) => {
+            const isEditing = isAdmin && !creatingFecha && event.id === editingFechaId;
+            const summary = formatRaceDiscardSummary(event);
+            return (
+              <article
+                key={event.id}
+                className={`rounded-2xl p-4 space-y-2.5 transition-colors ${
+                  isEditing
+                    ? "bg-cyan-500/10 border-2 border-cyan-400"
+                    : "bg-sea-800/80 border border-white/10"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="font-bold">{event.name}</h3>
+                    <p className="text-sm text-cyan-400">
+                      {event.date ? formatDay(event.date) : "Sin día"} · {event.time || "—"} hs
+                    </p>
+                    <p className={`text-[10px] mt-0.5 ${summary.raced ? "text-cyan-300/80" : "text-slate-400"}`}>
+                      {summary.line}
+                    </p>
                   </div>
-                ) : null}
-              </div>
-              {isAdmin ? (
-                <p className="text-[11px] text-slate-500">
-                  PDF · AR: {event.ar?.name || "—"} · IR: {event.ir?.name || "—"}
-                </p>
-              ) : null}
-              <div className="flex gap-2">
-                <button type="button" onClick={() => onDownload(event.id, "ar")} className="flex-1 bg-white/10 rounded-xl py-2.5 text-xs font-bold">
-                  AR
-                </button>
-                <button type="button" onClick={() => onDownload(event.id, "ir")} className="flex-1 bg-white/10 rounded-xl py-2.5 text-xs font-bold">
-                  IR
-                </button>
-              </div>
-            </article>
-          ))
+                  {isAdmin ? (
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => (isEditing ? onCancelFechaEditor() : onEditFecha(event.id))}
+                        className={`text-xs px-2 py-1 rounded-lg ${
+                          isEditing ? "bg-cyan-500 text-sea-900 font-bold" : "bg-white/10"
+                        }`}
+                      >
+                        {isEditing ? "Cerrar" : "Editar"}
+                      </button>
+                      {!isEditing ? (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteFecha(event.id)}
+                          className="text-xs text-red-300 px-2 py-1"
+                        >
+                          Borrar
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+
+                {isEditing ? (
+                  <form ref={fechaFormRef} className="space-y-2.5 pt-1 border-t border-white/10" onSubmit={onSaveFecha}>
+                    <FechaFields
+                      form={fechaForm}
+                      fileEpoch={fileEpoch}
+                      arHint={arHint}
+                      irHint={irHint}
+                      maxDiscards={maxDiscards}
+                      onChange={onFechaForm}
+                    />
+                    <button className="w-full bg-cyan-500 text-sea-900 font-bold py-3 rounded-xl text-sm">
+                      Guardar cambios
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    {isAdmin ? (
+                      <p className="text-[11px] text-slate-500">
+                        PDF · AR: {event.ar?.name || "—"} · IR: {event.ir?.name || "—"}
+                      </p>
+                    ) : null}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onDownload(event.id, "ar")}
+                        className="flex-1 bg-white/10 rounded-xl py-2.5 text-xs font-bold"
+                      >
+                        AR
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDownload(event.id, "ir")}
+                        className="flex-1 bg-white/10 rounded-xl py-2.5 text-xs font-bold"
+                      >
+                        IR
+                      </button>
+                    </div>
+                  </>
+                )}
+              </article>
+            );
+          })
         ) : (
           <Card className="text-sm text-slate-400">Todavía no hay fechas publicadas.</Card>
         )}
       </section>
 
       {isAdmin ? (
-        <details className="group rounded-2xl border border-white/10 bg-sea-800/40 open:bg-sea-800/60">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-200 [&::-webkit-details-marker]:hidden">
-            Configuración del campeonato
-            <span className="block text-[10px] font-normal text-slate-500 mt-0.5">WhatsApp oficial y clases</span>
-          </summary>
-          <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-3">
-            <div className="space-y-2">
-              <h3 className="text-sm font-bold">Canal WhatsApp</h3>
-              <p className="text-xs text-slate-400">Si el grupo cambia, actualizá el link. Todos ven el acceso al instante.</p>
-              <form className="space-y-2.5" onSubmit={onSaveWhatsapp}>
-                <Field label="Link del grupo (chat.whatsapp.com)">
-                  <input
-                    ref={whatsappRef}
-                    type="url"
-                    required
-                    placeholder="https://chat.whatsapp.com/…"
-                    value={whatsappUrl}
-                    onChange={(event) => onWhatsappUrl(event.target.value)}
-                    className={controlClass}
-                  />
-                </Field>
-                <button className="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-sm">Guardar canal</button>
-              </form>
+        <Card className="space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-bold">Clases</h2>
+              <p className="text-[11px] text-slate-400 mt-0.5">Tocá una clase para editarla. Las categorías se eligen con chips.</p>
             </div>
-            <div className="space-y-2">
-              <h3 className="text-sm font-bold">Clases</h3>
-              <p className="text-xs text-slate-400">Los timoneles eligen estas clases al inscribirse. Categorías separadas por coma.</p>
-              <form ref={classFormRef} className="space-y-2" onSubmit={onSaveClass}>
-                <Field label="Nombre de la clase *">
-                  <input
-                    required
-                    placeholder="ILCA 6"
-                    value={classForm.name}
-                    onChange={(event) => onClassForm({ name: event.target.value })}
-                    className={controlClass}
-                  />
-                </Field>
-                <Field label="Categorías">
-                  <input
-                    placeholder="General, Junior, Master"
-                    value={classForm.categories}
-                    onChange={(event) => onClassForm({ categories: event.target.value })}
-                    className={controlClass}
-                  />
-                </Field>
-                <button className="w-full bg-white/10 font-bold py-2.5 rounded-xl text-sm">Guardar clase</button>
-              </form>
-              <div className="divide-y divide-white/5">
-                {classes.map((item) => (
-                  <div key={item.name} className="py-2.5 flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-sm">{item.name}</p>
-                      <p className="text-[10px] text-slate-400">{item.categories.join(", ")}</p>
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      <button type="button" onClick={() => onEditClass(item.name)} className="text-xs bg-white/10 px-2 py-1 rounded-lg">
-                        Editar
-                      </button>
-                      <button type="button" onClick={() => onDeleteClass(item.name)} className="text-xs text-red-300 px-2 py-1">
-                        Borrar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={onBeginNewClass}
+              className="shrink-0 bg-white/10 text-xs font-bold px-3 py-1.5 rounded-xl"
+            >
+              Agregar
+            </button>
           </div>
-        </details>
-      ) : null}
+
+          {classFormOpen ? (
+            <form className="space-y-2.5 rounded-xl border border-cyan-400/40 bg-sea-900/40 p-3" onSubmit={onSaveClass}>
+              <p className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">
+                {classIsEdit ? `Editando ${classForm.original}` : "Nueva clase"}
+              </p>
+              <Field label="Nombre *">
+                <input
+                  required
+                  placeholder="ILCA 6"
+                  value={classForm.name}
+                  onChange={(event) => onClassForm({ name: event.target.value })}
+                  className={controlClass}
+                />
+              </Field>
+              <div>
+                <p className="text-[11px] uppercase text-slate-400 font-semibold">Categorías</p>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {categoryChoices(classForm.categories).map((label) => {
+                    const on = classForm.categories.some((item) => item.toLowerCase() === label.toLowerCase());
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => onToggleCategory(label)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                          on ? "bg-cyan-500 text-sea-900" : "bg-white/10 text-slate-300"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <AddCategoryField onAdd={onAddCategory} />
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 bg-cyan-500 text-sea-900 font-bold py-2.5 rounded-xl text-sm">
+                  {classIsEdit ? "Guardar" : "Agregar clase"}
+                </button>
+                <button type="button" onClick={onCancelClassEdit} className="px-3 bg-white/10 rounded-xl text-sm">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          ) : null}
+
+          <div className="divide-y divide-white/5">
+            {classes.map((item) => (
+              <div key={item.name} className="py-2.5 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm">{item.name}</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {item.categories.map((category) => (
+                      <span key={category} className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/10 text-slate-400">
+                        {category}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button type="button" onClick={() => onEditClass(item.name)} className="text-xs bg-white/10 px-2 py-1 rounded-lg">
+                    Editar
+                  </button>
+                  <button type="button" onClick={() => onDeleteClass(item.name)} className="text-xs text-red-300 px-2 py-1">
+                    Borrar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : (
+        <Card className="text-sm text-slate-400">
+          Para crear o cambiar fechas y clases, ingresá el PIN de comisión (pestaña Carga).
+        </Card>
+      )}
     </div>
+  );
+}
+
+function FechaFields({
+  form,
+  fileEpoch,
+  arHint,
+  irHint,
+  maxDiscards,
+  onChange
+}: {
+  form: FechaFormState;
+  fileEpoch: number;
+  arHint: string;
+  irHint: string;
+  maxDiscards: number;
+  onChange: (patch: Partial<FechaFormState>) => void;
+}) {
+  return (
+    <>
+      <Field label="Nombre *">
+        <input
+          required
+          placeholder="Fecha 2"
+          value={form.name}
+          onChange={(event) => onChange({ name: event.target.value })}
+          className={controlClass}
+        />
+      </Field>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Field label="Día *">
+          <input
+            type="date"
+            required
+            value={form.date}
+            onChange={(event) => onChange({ date: event.target.value })}
+            className={controlClass}
+          />
+        </Field>
+        <Field label="Hora largada *">
+          <input
+            type="time"
+            required
+            value={form.time}
+            onChange={(event) => onChange({ time: event.target.value })}
+            className={controlClass}
+          />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Field label="Regatas">
+          <select
+            value={String(form.racesCount)}
+            onChange={(event) => {
+              const racesCount = Number(event.target.value);
+              onChange({
+                racesCount,
+                discardsAllowed: Math.min(form.discardsAllowed, Math.max(0, racesCount - 1))
+              });
+            }}
+            className={controlClass}
+          >
+            {Array.from({ length: MAX_RACES }, (_, index) => {
+              const count = index + 1;
+              return (
+                <option key={count} value={count}>
+                  {count === 1 ? "1 regata" : `${count} regatas`}
+                </option>
+              );
+            })}
+          </select>
+        </Field>
+        <Field label="Descartes">
+          <select
+            value={String(form.discardsAllowed)}
+            onChange={(event) => onChange({ discardsAllowed: Number(event.target.value) })}
+            className={controlClass}
+          >
+            {Array.from({ length: maxDiscards + 1 }, (_, count) => (
+              <option key={count} value={count}>
+                {count === 0 ? "Sin descarte" : `${count} descarte${count === 1 ? "" : "s"}`}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <p className="text-[10px] text-slate-500 leading-relaxed -mt-1">
+        Misma regla para las dos: se guardan en esta fecha. Placa y ranking usan solo las regatas con resultado. Con 3 o
+        más, el campeonato usa 1 descarte salvo que elijas otro.
+      </p>
+      <Field label="Avisos (TOA)">
+        <textarea
+          rows={2}
+          placeholder="Cambios de IR, horario…"
+          value={form.avisos}
+          onChange={(event) => onChange({ avisos: event.target.value })}
+          className={controlClass}
+        />
+      </Field>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Field label="AR (PDF)">
+          <input
+            key={`ar-${fileEpoch}`}
+            name="ar"
+            type="file"
+            accept=".pdf,application/pdf"
+            className="mt-1 w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-cyan-500 file:text-sea-900 file:font-bold file:px-2 file:py-1"
+          />
+          <span className="mt-1 block text-[10px] text-slate-500">{arHint}</span>
+        </Field>
+        <Field label="IR (PDF)">
+          <input
+            key={`ir-${fileEpoch}`}
+            name="ir"
+            type="file"
+            accept=".pdf,application/pdf"
+            className="mt-1 w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-cyan-500 file:text-sea-900 file:font-bold file:px-2 file:py-1"
+          />
+          <span className="mt-1 block text-[10px] text-slate-500">{irHint}</span>
+        </Field>
+      </div>
+    </>
+  );
+}
+
+function categoryChoices(selected: string[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const label of [...DEFAULT_CLASS_CATEGORIES, ...selected]) {
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out;
+}
+
+function AddCategoryField({ onAdd }: { onAdd: (label: string) => void }) {
+  return (
+    <input
+      placeholder="Otra (Enter)"
+      className={`${controlClass} mt-1.5`}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        const value = event.currentTarget.value.trim();
+        if (!value) return;
+        onAdd(value);
+        event.currentTarget.value = "";
+      }}
+    />
   );
 }
 

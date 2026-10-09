@@ -28,7 +28,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`bg-sea-800 rounded-2xl p-4 border border-white/10 ${className}`}>{children}</section>
+    <section className={`bg-sea-800 rounded-2xl p-4 lg:p-5 border border-white/10 ${className}`}>{children}</section>
   );
 }
 
@@ -47,40 +47,14 @@ export function SyncBadge({ mode, label }: { mode: "live" | "error" | "local"; l
 export function Toast({ text, visible }: { text: string; visible: boolean }) {
   return (
     <div
-      className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-cyan-500 text-sea-900 px-4 py-2 rounded-2xl text-xs font-bold shadow-xl pointer-events-none transition ${visible ? "opacity-100" : "opacity-0"}`}
+      className={`app-toast fixed left-1/2 -translate-x-1/2 z-50 bg-cyan-500 text-sea-900 px-4 py-2 rounded-xl text-xs font-bold shadow-xl pointer-events-none transition ${visible ? "opacity-100" : "opacity-0"}`}
     >
       {text}
     </div>
   );
 }
 
-export function ClassChips({
-  names,
-  value,
-  onChange
-}: {
-  names: string[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="flex gap-1.5 overflow-x-auto">
-      {["ALL", ...names].map((name) => {
-        const selected = value === name;
-        return (
-          <button
-            key={name}
-            type="button"
-            onClick={() => onChange(name)}
-            className={`whitespace-nowrap px-2.5 py-1 rounded-lg text-[10px] font-bold ${selected ? "bg-cyan-500 text-sea-900" : "bg-white/10 text-slate-300"}`}
-          >
-            {name === "ALL" ? "Todas" : name}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+export { ClassChips } from "./ClassChips";
 
 export function FechaBar({
   events,
@@ -95,7 +69,7 @@ export function FechaBar({
     return <p className="text-xs text-slate-500 px-2 py-1">Sin fechas. Creálas en la pestaña Fechas.</p>;
   }
   return (
-    <div className="flex gap-1 overflow-x-auto">
+    <div className="class-chips-scroll flex gap-1 overflow-x-auto py-0.5">
       {events.map((event) => {
         const selected = event.id === activeId;
         return (
@@ -103,7 +77,7 @@ export function FechaBar({
             key={event.id}
             type="button"
             onClick={() => onSelect(event.id)}
-            className={`fecha-chip shrink-0 py-2 px-3 rounded-xl text-xs font-bold ${selected ? "bg-cyan-500 text-sea-900" : "text-slate-400"}`}
+            className={`shrink-0 py-1 px-2.5 rounded-md text-[10px] font-bold leading-none whitespace-nowrap ${selected ? "bg-cyan-500 text-sea-900" : "bg-white/10 text-slate-400"}`}
           >
             {event.name}
           </button>
@@ -113,42 +87,4 @@ export function FechaBar({
   );
 }
 
-const TABS = [
-  { id: "inscripcion", icon: "✎", label: "Insc." },
-  { id: "fechas", icon: "📅", label: "Fechas" },
-  { id: "carga", icon: "📋", label: "Carga" },
-  { id: "placa", icon: "🏁", label: "Placa" },
-  { id: "ranking", icon: "🏆", label: "Ranking" }
-] as const;
-
-export function BottomNav({
-  tab,
-  onChange
-}: {
-  tab: (typeof TABS)[number]["id"];
-  onChange: (tab: (typeof TABS)[number]["id"]) => void;
-}) {
-  return (
-    <nav
-      className="fixed bottom-0 inset-x-0 z-40 bg-sea-800/95 backdrop-blur border-t border-white/10"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-    >
-      <div className="max-w-lg mx-auto grid grid-cols-5 py-2 px-0.5">
-        {TABS.map((item) => {
-          const selected = item.id === tab;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onChange(item.id)}
-              className={`nav-btn ${selected ? "text-cyan-400 font-bold" : "text-slate-400"}`}
-            >
-              <span className="block text-base leading-none">{item.icon}</span>
-              <span className="text-[9px]">{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
+export { BottomNav, TopNav } from "./AppNavigation";

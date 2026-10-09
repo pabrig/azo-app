@@ -8,6 +8,8 @@ export type InscripcionDraft = {
   name: string;
   category: string;
   club: string;
+  celular: string;
+  dni: string;
   fecha: string;
 };
 
@@ -17,22 +19,26 @@ export function InscripcionView({
   categories,
   fechas,
   brief,
+  canRegister,
+  isAdmin,
   sailors,
   onChange,
   onSubmit,
-  onDownload,
+  onEdit,
   onDelete
 }: {
   draft: InscripcionDraft;
   classes: string[];
   categories: string[];
-  fechas: { id: string; label: string }[];
+  fechas: { id: string; label: string; registrationClosed?: boolean }[];
   brief: Fecha | null;
+  canRegister: boolean;
+  isAdmin: boolean;
   sailors: { sailor: Sailor; fechas: string }[];
   onChange: (patch: Partial<InscripcionDraft>) => void;
   onSubmit: (event: FormEvent) => void;
-  onDownload: (kind: "ar" | "ir") => void;
-  onDelete: (id: string) => void;
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void | Promise<void>;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const previousCount = useRef(sailors.length);
@@ -46,32 +52,9 @@ export function InscripcionView({
   }, [sailors.length]);
 
   return (
-    <div className="space-y-3">
-      <Card className="space-y-2 text-sm">
-        {brief ? (
-          <>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Próxima / seleccionada</p>
-              <h3 className="font-bold">{brief.name}</h3>
-              <p className="text-slate-300">
-                {brief.date ? formatBriefDay(brief.date) : "Día a confirmar"} · {brief.time || ""} hs
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => onDownload("ar")} className="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold">
-                Descargar AR
-              </button>
-              <button type="button" onClick={() => onDownload("ir")} className="flex-1 bg-white/10 rounded-xl py-2 text-xs font-bold">
-                Descargar IR
-              </button>
-            </div>
-          </>
-        ) : (
-          <p className="text-slate-400 text-sm">Todavía no hay fechas del campeonato.</p>
-        )}
-      </Card>
-
-      <form onSubmit={onSubmit} className="bg-sea-800 rounded-2xl p-4 border border-white/10 space-y-3 shadow-lg">
+    <div className="inscripcion-layout space-y-3 min-w-0">
+      {canRegister ? (
+      <form onSubmit={onSubmit} className="bg-sea-800 rounded-2xl p-4 lg:p-5 border border-white/10 space-y-3 shadow-lg">
         <div className="flex items-center justify-between">
           <h2 className="font-bold">Inscripción</h2>
           <span className="text-[10px] uppercase tracking-wider text-cyan-400 font-semibold">Timonel</span>
@@ -134,6 +117,29 @@ export function InscripcionView({
             />
           </Field>
         </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Field label="Celular">
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="11 1234-5678"
+              value={draft.celular}
+              onChange={(event) => onChange({ celular: event.target.value })}
+              className={controlClass}
+            />
+          </Field>
+          <Field label="DNI">
+            <input
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="12345678"
+              value={draft.dni}
+              onChange={(event) => onChange({ dni: event.target.value })}
+              className={controlClass}
+            />
+          </Field>
+        </div>
         <Field label="Fecha *">
           <select
             required
@@ -142,8 +148,9 @@ export function InscripcionView({
             className={controlClass}
           >
             {fechas.map((fecha) => (
-              <option key={fecha.id} value={fecha.id}>
+              <option key={fecha.id} value={fecha.id} disabled={fecha.registrationClosed}>
                 {fecha.label}
+                {fecha.registrationClosed ? " (cerrada)" : ""}
               </option>
             ))}
           </select>
@@ -156,6 +163,20 @@ export function InscripcionView({
           Confirmar inscripción
         </button>
       </form>
+      ) : (
+        <Card className="border-amber-400/25 bg-amber-500/5 space-y-2">
+          <h2 className="font-bold text-sm">Inscripción cerrada</h2>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Esta fecha ya se disputó. Como timonel podés consultar quién está inscripto y descargar AR/IR; la comisión
+            puede inscribir si hace falta.
+          </p>
+          {!isAdmin && brief?.date ? (
+            <p className="text-[11px] text-slate-500">
+              Regata: {brief.date.split("-").reverse().join("/")}
+            </p>
+          ) : null}
+        </Card>
+      )}
 
       <Card>
         <div className="flex items-center justify-between mb-2">
@@ -168,7 +189,12 @@ export function InscripcionView({
           ) : sailors.length ? (
             sailors.map(({ sailor, fechas: fechaText }) => (
               <div key={sailor.id} className="py-2.5 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  className="flex items-center gap-2 min-w-0 text-left flex-1 disabled:cursor-default"
+                  onClick={() => onEdit(sailor.id)}
+                  disabled={!isAdmin}
+                >
                   <span className="font-mono font-bold text-cyan-400 bg-sea-900 border border-white/10 px-2 py-1 rounded-lg text-[11px]">
                     {sailor.sailNumber}
                   </span>
@@ -177,12 +203,21 @@ export function InscripcionView({
                     <p className="text-[10px] text-slate-400">
                       {sailor.boatClass} · {sailor.category} · {sailor.club}
                     </p>
+                    {isAdmin && (sailor.celular || sailor.dni) ? (
+                      <p className="text-[10px] text-slate-500">
+                        {[sailor.dni ? `DNI ${sailor.dni}` : null, sailor.celular]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    ) : null}
                     <p className="text-[10px] text-cyan-400/80">{fechaText}</p>
                   </div>
-                </div>
-                <button type="button" onClick={() => onDelete(sailor.id)} className="text-slate-500 text-xs px-2">
-                  ✕
                 </button>
+                {isAdmin ? (
+                  <button type="button" onClick={() => onDelete(sailor.id)} className="text-slate-500 text-xs px-2">
+                    ✕
+                  </button>
+                ) : null}
               </div>
             ))
           ) : (
@@ -192,9 +227,4 @@ export function InscripcionView({
       </Card>
     </div>
   );
-}
-
-function formatBriefDay(iso: string) {
-  const [year, month, day] = iso.split("-");
-  return `${day}/${month}/${year}`;
 }

@@ -1,4 +1,5 @@
 export function isDevHost() {
+  if (typeof location === "undefined") return false;
   const host = (location.hostname || "").toLowerCase();
   return (
     host === "localhost" ||

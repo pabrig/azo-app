@@ -1,41 +1,42 @@
-import { useRef } from "react";
 import { useChampionship } from "../../app/championship-context";
-import { classNames, effectiveClassFilter } from "../../domain/model";
-import { rankedOverall } from "../../domain/scoring";
+import { classNames, resultsClassFilter } from "../../domain/model";
+import { fechasWithResults, rankedOverall } from "../../domain/scoring";
 import { ResultadosView } from "./Resultados.view";
 
 export function Ranking() {
   const api = useChampionship();
-  const cardRef = useRef<HTMLDivElement>(null);
-  const filter = effectiveClassFilter(api.state);
-  const rows = rankedOverall(api.state).map((sailor, index) => ({
-    id: sailor.id,
-    position: index + 1,
-    sailNumber: sailor.sailNumber,
-    name: sailor.name,
-    boatClass: sailor.boatClass,
-    cells: sailor.breakdown.map(String),
-    net: sailor.net
-  }));
+  const filter = resultsClassFilter(api.state);
+  const scope = { ...api.state, classFilter: filter };
+  const resultFechas = fechasWithResults(scope);
+  const rows = resultFechas.length
+    ? rankedOverall(scope).map((sailor, index) => ({
+        id: sailor.id,
+        position: index + 1,
+        sailNumber: sailor.sailNumber,
+        name: sailor.name,
+        boatClass: sailor.boatClass,
+        cells: sailor.breakdown.map(String),
+        net: sailor.net
+      }))
+    : [];
 
   return (
     <ResultadosView
-      cardRef={cardRef}
       title="RANKING GENERAL"
-      classLabel={filter === "ALL" ? "Todas las clases" : filter}
+      classLabel={filter}
       year={String(new Date().getFullYear())}
       stamp={new Date().toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}
-      columns={api.state.events.map((event, index) => event.name.replace("Fecha ", "F") || `F${index + 1}`)}
+      columns={resultFechas.map((event, index) => event.name.replace("Fecha ", "F") || `F${index + 1}`)}
       rows={rows}
       classNames={classNames(api.state)}
       classFilter={filter}
       onClassFilter={api.setClassFilter}
-      onToast={api.showToast}
-      pngFilename="Ranking_General_CNA.png"
+      pdfFilename="Ranking_General_CNA.pdf"
       note={
-        <p className="text-[11px] text-slate-400 px-1">
-          Suma de puntos netos de todas las fechas (menor puntaje gana). Descarte del peor resultado si una fecha tiene 4
-          o más regatas. El campeonato prevé un descarte según el AR.
+        <p className="text-slate-500">
+          {resultFechas.length
+            ? "Suma de puntos netos por fecha con resultados cargados (menor puntaje gana). Cada fecha usa solo las regatas publicadas en placa y los descartes definidos en Fechas. Las columnas vacías no suman."
+            : "Todavía no hay fechas con resultados cargados. El ranking se publicará cuando la comisión empiece la carga."}
         </p>
       }
     />

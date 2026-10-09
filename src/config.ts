@@ -17,3 +17,12 @@ export const config = {
 
 export const CHAMP_ID = "main";
 export const MAX_DOC_BYTES = 2.5 * 1024 * 1024;
+
+/** Punto de referencia para el pronóstico (Río de la Plata / CNA). Override con VITE_WEATHER_*. */
+export const weatherVenue = {
+  latitude: Number(import.meta.env.VITE_WEATHER_LAT ?? -34.4492),
+  longitude: Number(import.meta.env.VITE_WEATHER_LON ?? -58.5058),
+  elevation: Number(import.meta.env.VITE_WEATHER_ELEVATION ?? 0),
+  timezone: import.meta.env.VITE_WEATHER_TZ || "America/Argentina/Buenos_Aires",
+  label: import.meta.env.VITE_WEATHER_LABEL || "Club Náutico Azopardo"
+};

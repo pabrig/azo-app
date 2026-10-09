@@ -1,4 +1,7 @@
-export const PENALTY_CODES = ["DNC", "DNS", "OCS", "DNF", "DSQ"] as const;
+export const PENALTY_CODES = ["DNC", "DNS", "OCS", "DNF", "DSQ", "DNE"] as const;
+
+/** RRS A9: no se descartan del series score (Ap. A). */
+export const NON_DISCARDABLE_PENALTIES = ["DNE", "DSQ"] as const;
 
 export type PenaltyCode = (typeof PENALTY_CODES)[number];
 
@@ -17,6 +20,8 @@ export type Fecha = {
   ar: RaceDoc;
   ir: RaceDoc;
   racesCount: number;
+  /** Cantidad de peores regatas descartables en el neto de esta fecha (comisión). */
+  discardsAllowed: number;
   scores: Record<string, Array<string | null>>;
   updatedAt?: number;
   scoreAt?: Record<string, number>;
@@ -39,6 +44,8 @@ export type Sailor = {
   name: string;
   category: string;
   club: string;
+  celular?: string;
+  dni?: string;
   fechas?: string[];
   updatedAt?: number;
 };
@@ -72,6 +79,8 @@ export type DateNet = {
   raw: Array<string | null | undefined>;
   net: number;
   discarded: number | null;
+  /** Índices de regata cuyo puntaje se descartó en el neto de la fecha. */
+  discardedRaceIndexes: number[];
 };
 
 export type RankedSailor = Sailor & DateNet;
@@ -87,7 +96,20 @@ export type RegisterInput = {
   name: string;
   category: string;
   club: string;
+  celular?: string;
+  dni?: string;
   fecha: string;
+};
+
+export type SailorSaveInput = {
+  id: string;
+  sailNumber: string;
+  boatClass: string;
+  name: string;
+  category: string;
+  club: string;
+  celular?: string;
+  dni?: string;
 };
 
 export type FechaSaveInput = {
@@ -96,6 +118,8 @@ export type FechaSaveInput = {
   date: string;
   time: string;
   avisos: string;
+  racesCount?: number;
+  discardsAllowed?: number;
   ar?: RaceDoc;
   ir?: RaceDoc;
 };
