@@ -48,7 +48,7 @@ function rowPath(id: string) {
 async function main() {
   const push = process.argv.includes("--push");
   console.log("Fetching Appwrite row", CHAMP_ID, "…");
-  const row = await request("GET", rowPath(CHAMP_ID));
+  const row = (await request("GET", rowPath(CHAMP_ID))) as { events?: unknown; sailors?: unknown };
 
   const before = cloudView(row);
   const { state, report } = migrateChampionshipState(before);
@@ -77,10 +77,13 @@ async function main() {
 
   if (push) {
     console.log("\nSubiendo a Appwrite…");
-    const payload = cloudPayload(state);
-    await request("PATCH", rowPath(CHAMP_ID), {
-      sailors: payload.sailors,
-      events: payload.events
+    state.events.forEach((event) => {
+      console.log(" • write", event.name, "regatas", event.racesCount, "descartes", event.discardsAllowed);
+    });
+    await request("PATCH", rowPath(CHAMP_ID), { data: cloudPayload(state) });
+    const verify = cloudView(await request("GET", rowPath(CHAMP_ID)));
+    verify.events.forEach((event) => {
+      console.log(" • cloud", event.name, "regatas", event.racesCount, "descartes", event.discardsAllowed);
     });
     console.log("Listo: cloud actualizado.");
   } else {

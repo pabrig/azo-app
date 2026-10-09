@@ -1,4 +1,5 @@
 import { canonicalBoatClassName } from "./class-names";
+import { clampRacesCount } from "./race-slots";
 import type { BoatClass, ChampionshipState, Fecha, RemovedSailor, Sailor } from "./types";
 
 function defaultDiscardsAllowed(racesCount: number) {
@@ -49,13 +50,13 @@ function migrateRemovedClasses(stamps: RemovedSailor[]) {
 function migrateFechaDiscards(events: Fecha[], report: string[]) {
   let changed = false;
   const next = events.map((event) => {
-    const racesCount = event.racesCount || 0;
+    const racesCount = clampRacesCount(event.racesCount);
     const current = event.discardsAllowed ?? defaultDiscardsAllowed(racesCount);
     const target = defaultDiscardsAllowed(racesCount);
     if (racesCount >= 3 && current < target) {
       changed = true;
       report.push(`${event.name}: descartes ${current} → ${target} (${racesCount} regatas)`);
-      return { ...event, discardsAllowed: target, updatedAt: Date.now() };
+      return { ...event, racesCount, discardsAllowed: target, updatedAt: Date.now() };
     }
     return event;
   });
@@ -86,9 +87,6 @@ export function normalizeChampionshipClasses(state: ChampionshipState): {
   const removedSailors = migrateRemovedClasses(state.removedSailors);
   if (JSON.stringify(removedSailors) !== JSON.stringify(state.removedSailors)) changed = true;
 
-  const discardsResult = migrateFechaDiscards(state.events, report);
-  changed ||= discardsResult.changed;
-
   if (JSON.stringify(mergedClasses) !== JSON.stringify(state.classes)) changed = true;
   if (classFilter !== state.classFilter) changed = true;
 
@@ -103,7 +101,7 @@ export function normalizeChampionshipClasses(state: ChampionshipState): {
       classes: mergedClasses,
       sailors: sailorsResult.sailors,
       removedSailors,
-      events: discardsResult.events,
+      events: state.events,
       classFilter
     }
   };
@@ -111,9 +109,15 @@ export function normalizeChampionshipClasses(state: ChampionshipState): {
 
 /** Migración explícita (script Appwrite). */
 export function migrateChampionshipState(state: ChampionshipState): { state: ChampionshipState; report: string[] } {
-  const { state: next, changed, report } = normalizeChampionshipClasses(state);
+  const classes = normalizeChampionshipClasses(state);
+  const discards = migrateFechaDiscards(classes.state.events, classes.report);
+  const changed = classes.changed || discards.changed;
   return {
-    state: changed ? { ...next, classesAt: Date.now() } : next,
-    report
+    state: {
+      ...classes.state,
+      events: discards.events,
+      classesAt: changed ? Date.now() : classes.state.classesAt
+    },
+    report: classes.report
   };
 }

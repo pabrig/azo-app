@@ -2,6 +2,7 @@ import { useChampionship } from "../../app/championship-context";
 import { classNames, currentEvent, formatDay, resultsClassFilter } from "../../domain/model";
 import {
   fechaResultsStarted,
+  formatRaceDiscardSummary,
   placaCellText,
   placaColumns,
   raceIndexesWithResults,
@@ -41,6 +42,11 @@ export function Placa() {
         event && !started ? (
           <p className="text-slate-500">
             Todavía no hay resultados para esta fecha. Aparecerán cuando la comisión empiece la carga en la pestaña Carga.
+          </p>
+        ) : event ? (
+          <p className="text-slate-500">
+            {formatRaceDiscardSummary(event).line}. Low Point: menor puntaje gana. Las columnas vacías de carga no
+            aparecen.
           </p>
         ) : undefined
       }

@@ -1,12 +1,12 @@
 import { PENALTY_CODES, type PenaltyCode } from "./types";
 
-/** Opciones de penalización en el desplegable de Carga (valor RRS → etiqueta comisión). */
+/** Opciones de penalización en Carga. La etiqueta es la sigla RRS. */
 export const COMMISSION_PENALTY_OPTIONS: readonly { value: PenaltyCode; label: string }[] = [
   { value: "DNC", label: "DNC" },
   { value: "DNS", label: "DNS" },
   { value: "OCS", label: "OCS" },
   { value: "DNF", label: "DNF" },
-  { value: "DSQ", label: "Descalificado" },
+  { value: "DSQ", label: "DSQ" },
   { value: "DNE", label: "DNE" }
 ];
 

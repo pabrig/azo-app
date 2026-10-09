@@ -859,6 +859,39 @@ textarea {
   box-shadow: 0 16px 40px rgb(0 0 0 / 0.35);
 }
 
+.app-modal--wide {
+  max-width: 28rem;
+  max-height: 85vh;
+  overflow: auto;
+}
+
+.score-pad {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.score-pad__btn {
+  height: 2.2rem;
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 0.08);
+  color: rgb(226 232 240);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.score-pad__btn--on {
+  background: #2eb5e0;
+  color: #05283d;
+}
+
+.score-pad__penalties {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+
 .app-modal-btn {
   flex: 1;
   border-radius: 0.75rem;

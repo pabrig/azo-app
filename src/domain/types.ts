@@ -101,12 +101,24 @@ export type RegisterInput = {
   fecha: string;
 };
 
+export type SailorSaveInput = {
+  id: string;
+  sailNumber: string;
+  boatClass: string;
+  name: string;
+  category: string;
+  club: string;
+  celular?: string;
+  dni?: string;
+};
+
 export type FechaSaveInput = {
   id: string;
   name: string;
   date: string;
   time: string;
   avisos: string;
+  racesCount?: number;
   discardsAllowed?: number;
   ar?: RaceDoc;
   ir?: RaceDoc;

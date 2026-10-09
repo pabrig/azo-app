@@ -8,7 +8,8 @@ import {
 } from "./defaults";
 import { canonicalBoatClassName, sameBoatClass } from "./class-names";
 import { applyCanonicalClassNames } from "./migrate-championship";
-import type { BoatClass, ChampionshipState, Fecha, RemovedFecha, Sailor } from "./types";
+import { clampRacesCount, sliceScoreBook } from "./race-slots";
+import type { BoatClass, ChampionshipState, Fecha, RaceDoc, RemovedFecha, Sailor } from "./types";
 
 export { canonicalBoatClassName, sameBoatClass } from "./class-names";
 
@@ -42,8 +43,7 @@ export function defaultDiscardsAllowed(racesCount: number) {
   return racesCount >= 3 ? 1 : 0;
 }
 
-function resolveDiscardsAllowed(partial: Partial<Fecha>) {
-  const racesCount = partial.racesCount || 3;
+function resolveDiscardsAllowed(partial: Partial<Fecha>, racesCount: number) {
   const max = Math.max(0, racesCount - 1);
   if (typeof partial.discardsAllowed === "number" && Number.isFinite(partial.discardsAllowed)) {
     return Math.min(Math.max(0, Math.floor(partial.discardsAllowed)), max);
@@ -52,7 +52,8 @@ function resolveDiscardsAllowed(partial: Partial<Fecha>) {
 }
 
 export function makeFecha(partial: Partial<Fecha> = {}): Fecha {
-  const racesCount = partial.racesCount || 3;
+  const racesCount = clampRacesCount(partial.racesCount);
+  const scores = sliceScoreBook(partial.scores || {}, racesCount);
   return {
     id: partial.id || uid(),
     name: partial.name || "Nueva fecha",
@@ -62,8 +63,8 @@ export function makeFecha(partial: Partial<Fecha> = {}): Fecha {
     ar: bundledDoc(partial.ar, "ar"),
     ir: bundledDoc(partial.ir, "ir"),
     racesCount,
-    discardsAllowed: resolveDiscardsAllowed({ ...partial, racesCount }),
-    scores: partial.scores || {},
+    discardsAllowed: resolveDiscardsAllowed(partial, racesCount),
+    scores,
     ...(partial.updatedAt ? { updatedAt: partial.updatedAt } : {}),
     ...(partial.scoreAt && Object.keys(partial.scoreAt).length ? { scoreAt: partial.scoreAt } : {})
   };
@@ -223,6 +224,20 @@ export function mergeScoreBooks(
   return { scores, scoreAt };
 }
 
+/** Un PDF subido no se pierde si el otro lado solo trae el nombre/href. */
+export function mergeRaceDoc(winner: RaceDoc | undefined, loser: RaceDoc | undefined): RaceDoc {
+  if (winner?.dataUrl) return winner;
+  if (loser?.dataUrl) {
+    return {
+      ...loser,
+      ...winner,
+      dataUrl: loser.dataUrl,
+      name: winner?.name || loser.name
+    };
+  }
+  return winner || loser || { name: "" };
+}
+
 function mergeFechaRecords(a: Fecha, b: Fecha): Fecha {
   const aAt = a.updatedAt || 0;
   const bAt = b.updatedAt || 0;
@@ -243,9 +258,13 @@ function mergeFechaRecords(a: Fecha, b: Fecha): Fecha {
   }
   const { scores, scoreAt } = mergeScoreBooks(loser.scores, loser.scoreAt, winner.scores, winner.scoreAt);
   return {
+    ...loser,
     ...winner,
-    racesCount: Math.max(winner.racesCount || 0, loser.racesCount || 0),
+    ar: mergeRaceDoc(winner.ar, loser.ar),
+    ir: mergeRaceDoc(winner.ir, loser.ir),
     scores,
+    racesCount: winner.racesCount,
+    discardsAllowed: winner.discardsAllowed,
     ...(Object.keys(scoreAt).length ? { scoreAt } : {})
   };
 }

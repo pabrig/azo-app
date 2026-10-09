@@ -7,14 +7,16 @@ export function AppModal({
   kicker,
   onClose,
   children,
-  footer
+  footer,
+  size = "default"
 }: {
   open: boolean;
-  title: string;
+  title: ReactNode;
   kicker?: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  size?: "default" | "wide";
 }) {
   useEffect(() => {
     if (!open) return;
@@ -37,7 +39,7 @@ export function AppModal({
         role="dialog"
         aria-labelledby="app-modal-title"
         aria-modal="true"
-        className="app-modal"
+        className={`app-modal ${size === "wide" ? "app-modal--wide" : ""}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2 mb-2">

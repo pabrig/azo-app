@@ -35,7 +35,7 @@ export function Ranking() {
       note={
         <p className="text-slate-500">
           {resultFechas.length
-            ? "Suma de puntos netos por fecha con resultados cargados (menor puntaje gana). Las fechas sin carga de la comisión no aparecen ni suman. Los descartes los define la comisión en Fechas, por fecha."
+            ? "Suma de puntos netos por fecha con resultados cargados (menor puntaje gana). Cada fecha usa solo las regatas publicadas en placa y los descartes definidos en Fechas. Las columnas vacías no suman."
             : "Todavía no hay fechas con resultados cargados. El ranking se publicará cuando la comisión empiece la carga."}
         </p>
       }

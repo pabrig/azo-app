@@ -1,17 +1,21 @@
 import type { FormEvent } from "react";
 import { useChampionship } from "../../app/championship-context";
-import { classNames, currentEvent, effectiveClassFilter, filteredSailors, formatDay } from "../../domain/model";
+import { classNames, currentEvent, filteredSailors, formatDay, resultsClassFilter } from "../../domain/model";
+import { clampRacesCount } from "../../domain/race-slots";
 import { canonicalScoreCell } from "../../domain/score-entry";
-import { dateNet, effectiveDiscardsAllowed, formatRaceCellDisplay, raceIndexesWithResults } from "../../domain/scoring";
+import { dateNet, formatRaceCellDisplay, formatRaceDiscardSummary, raceIndexesWithResults } from "../../domain/scoring";
 import type { Sailor } from "../../domain/types";
 import { CargaView } from "./Carga.view";
 
 export function Carga() {
   const api = useChampionship();
   const event = currentEvent(api.state);
+  const filter = resultsClassFilter(api.state);
   const subtitle = event
-    ? `${event.name} · ${formatDay(event.date)} ${event.time} · ${event.racesCount} regata${event.racesCount > 1 ? "s" : ""} · ${effectiveDiscardsAllowed(event)} descarte${effectiveDiscardsAllowed(event) === 1 ? "" : "s"} neto`
+    ? `${event.name} · ${formatDay(event.date)} ${event.time}`
     : "Creá una fecha en la pestaña Fechas.";
+  const summary = event ? formatRaceDiscardSummary(event) : null;
+  const racesCount = event ? clampRacesCount(event.racesCount) : 0;
 
   function onUnlock(formEvent: FormEvent<HTMLFormElement>) {
     formEvent.preventDefault();
@@ -25,15 +29,14 @@ export function Carga() {
       locked={!api.isAdmin}
       hasEvent={Boolean(event)}
       subtitle={subtitle}
+      summaryLine={summary?.line || ""}
       classNames={classNames(api.state)}
-      classFilter={effectiveClassFilter(api.state)}
-      racesCount={event?.racesCount || 0}
-      sailors={event ? filteredSailors(api.state, event.id) : []}
+      classFilter={filter}
+      racesCount={racesCount}
+      sailors={event ? filteredSailors({ ...api.state, classFilter: filter }, event.id) : []}
       scoresFor={(sailorId) => (event ? event.scores[sailorId] || [] : [])}
       onUnlock={onUnlock}
       onClassFilter={api.setClassFilter}
-      onAddRace={api.addRace}
-      onRemoveRace={api.removeRace}
       onScore={api.updateScore}
       raceCellLegend={
         event

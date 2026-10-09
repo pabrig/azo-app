@@ -5,6 +5,7 @@ import {
   boatClasses,
   compactDuplicateFechas,
   defaultState,
+  mergeRaceDoc,
   mergeScoreBooks,
   migrateClasses,
   migrateEvents,
@@ -13,11 +14,13 @@ import {
   sailorKey,
   seedEvents
 } from "./model";
+import { clampRacesCount, sliceScoreBook } from "./race-slots";
 import type { BoatClass, ChampionshipState, Fecha, RemovedFecha, RemovedSailor, Sailor } from "./types";
 
 export type UnwrappedEvents = {
   events: Fecha[];
   whatsappUrl: string | null;
+  whatsappAt: number;
   classes: unknown;
   classesAt: number;
   removedSailors: RemovedSailor[];
@@ -28,6 +31,7 @@ export type ParsedCloud = {
   sailors: Sailor[];
   events: Fecha[];
   whatsappUrl: string | null;
+  whatsappAt: number;
   classes: BoatClass[] | null;
   classesAt: number;
   removedSailors: RemovedSailor[];
@@ -40,6 +44,7 @@ export function wrapEventsForCloud(state: ChampionshipState) {
   const payload: {
     fechas: Fecha[];
     whatsappUrl: string;
+    whatsappAt: number;
     classes: BoatClass[];
     classesAt: number;
     removedSailors?: RemovedSailor[];
@@ -47,6 +52,7 @@ export function wrapEventsForCloud(state: ChampionshipState) {
   } = {
     fechas: canonicalEvents(state.events),
     whatsappUrl: officialWhatsApp(state),
+    whatsappAt: state.whatsappAt || 0,
     classes: [...boatClasses(state)].sort((a, b) => a.name.localeCompare(b.name)),
     classesAt: state.classesAt || 0
   };
@@ -61,6 +67,7 @@ export function unwrapEvents(raw: unknown): UnwrappedEvents {
   const empty: UnwrappedEvents = {
     events: seedEvents(),
     whatsappUrl: DEFAULT_WHATSAPP,
+    whatsappAt: 0,
     classes: null,
     classesAt: 0,
     removedSailors: [],
@@ -79,6 +86,7 @@ export function unwrapEvents(raw: unknown): UnwrappedEvents {
     return {
       events: migrateEvents(value),
       whatsappUrl: null,
+      whatsappAt: 0,
       classes: null,
       classesAt: 0,
       removedSailors: [],
@@ -89,6 +97,7 @@ export function unwrapEvents(raw: unknown): UnwrappedEvents {
     const record = value as {
       fechas?: unknown;
       whatsappUrl?: string;
+      whatsappAt?: unknown;
       classes?: unknown;
       classesAt?: unknown;
       removedSailors?: unknown;
@@ -97,6 +106,7 @@ export function unwrapEvents(raw: unknown): UnwrappedEvents {
     return {
       events: migrateEvents(record.fechas),
       whatsappUrl: record.whatsappUrl || null,
+      whatsappAt: typeof record.whatsappAt === "number" ? record.whatsappAt : 0,
       classes: record.classes || null,
       classesAt: typeof record.classesAt === "number" ? record.classesAt : 0,
       removedSailors: parseRemoved(record.removedSailors),
@@ -105,6 +115,7 @@ export function unwrapEvents(raw: unknown): UnwrappedEvents {
   }
   const record = value as {
     whatsappUrl?: string;
+    whatsappAt?: unknown;
     classes?: unknown;
     classesAt?: unknown;
     removedSailors?: unknown;
@@ -113,6 +124,7 @@ export function unwrapEvents(raw: unknown): UnwrappedEvents {
   return {
     events: migrateEvents(value),
     whatsappUrl: record.whatsappUrl || null,
+    whatsappAt: typeof record.whatsappAt === "number" ? record.whatsappAt : 0,
     classes: record.classes || null,
     classesAt: typeof record.classesAt === "number" ? record.classesAt : 0,
     removedSailors: parseRemoved(record.removedSailors),
@@ -134,6 +146,7 @@ export function parseCloudDoc(doc: CloudRow | null | undefined): ParsedCloud {
       sailors: [],
       events: seedEvents(),
       whatsappUrl: DEFAULT_WHATSAPP,
+      whatsappAt: 0,
       classes: defaultBoatClasses(),
       classesAt: 0,
       removedSailors: [],
@@ -148,6 +161,7 @@ export function parseCloudDoc(doc: CloudRow | null | undefined): ParsedCloud {
     sailors: Array.isArray(sailors) ? sailors : [],
     events,
     whatsappUrl: unwrapped.whatsappUrl,
+    whatsappAt: unwrapped.whatsappAt,
     classes: unwrapped.classes ? migrateClasses(unwrapped.classes) : null,
     classesAt: unwrapped.classesAt,
     removedSailors: unwrapped.removedSailors,
@@ -163,6 +177,7 @@ export function cloudView(row: unknown): ChampionshipState {
     sailors: parsed.sailors,
     events,
     whatsappUrl: parsed.whatsappUrl || DEFAULT_WHATSAPP,
+    whatsappAt: parsed.whatsappAt || 0,
     classes: parsed.classes && parsed.classes.length ? parsed.classes : defaultBoatClasses(),
     removedSailors: parsed.removedSailors,
     removedFechas: parsed.removedFechas,
@@ -176,8 +191,34 @@ export function syncFingerprint(state: ChampionshipState) {
   return `${payload.sailors}\n${payload.events}`;
 }
 
+function pickWhatsapp(
+  localUrl: string | undefined,
+  localAt: number,
+  remoteUrl: string | null | undefined,
+  remoteAt: number
+) {
+  if (remoteAt > localAt) {
+    return { whatsappUrl: remoteUrl || localUrl || DEFAULT_WHATSAPP, whatsappAt: remoteAt };
+  }
+  if (localAt > remoteAt) {
+    return { whatsappUrl: localUrl || remoteUrl || DEFAULT_WHATSAPP, whatsappAt: localAt };
+  }
+  return {
+    whatsappUrl: remoteUrl || localUrl || DEFAULT_WHATSAPP,
+    whatsappAt: Math.max(localAt, remoteAt)
+  };
+}
+
+/** Realtime a veces manda el row sin `events`; no hay que rehidratar Fecha 1 semilla. */
+export function hasCloudChampionship(row: unknown): boolean {
+  const parsed = asCloudRow(row);
+  if (!parsed) return false;
+  return parsed.events != null && parsed.events !== "";
+}
+
 /** Une inscripciones de dos dispositivos. Una lista más corta no borra competidores. */
 export function mergeRemote(state: ChampionshipState, row: unknown): ChampionshipState {
+  if (!hasCloudChampionship(row)) return state;
   const parsed = parseCloudDoc(asCloudRow(row));
   const { sailors, removedSailors, idMap } = mergeSailors(
     state.sailors,
@@ -194,7 +235,7 @@ export function mergeRemote(state: ChampionshipState, row: unknown): Championshi
     removedSailors,
     removedFechas,
     events,
-    whatsappUrl: parsed.whatsappUrl || state.whatsappUrl,
+    ...pickWhatsapp(state.whatsappUrl, state.whatsappAt || 0, parsed.whatsappUrl, parsed.whatsappAt || 0),
     ...mergeClassesMeta(state.classes, state.classesAt || 0, parsed.classes, parsed.classesAt || 0),
     fecha
   });
@@ -322,10 +363,21 @@ function canonicalRemoved(stamps: RemovedSailor[]) {
 
 function canonicalEvents(events: Fecha[]) {
   return [...events]
-    .map((event) => ({
-      ...event,
-      scores: Object.fromEntries(Object.entries(event.scores || {}).sort(([a], [b]) => a.localeCompare(b)))
-    }))
+    .map((event) => {
+      const racesCount = clampRacesCount(event.racesCount);
+      const scores = sliceScoreBook(event.scores, racesCount);
+      return {
+        ...event,
+        racesCount,
+        discardsAllowed:
+          typeof event.discardsAllowed === "number" && Number.isFinite(event.discardsAllowed)
+            ? Math.min(Math.max(0, event.discardsAllowed), Math.max(0, racesCount - 1))
+            : racesCount >= 3
+              ? 1
+              : 0,
+        scores: Object.fromEntries(Object.entries(scores).sort(([a], [b]) => a.localeCompare(b)))
+      };
+    })
     .sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`) || a.id.localeCompare(b.id));
 }
 
@@ -440,21 +492,20 @@ function mergeEvents(
     }
     const localAt = previous.updatedAt || 0;
     const remoteAt = event.updatedAt || 0;
-    const winner = remoteAt >= localAt ? event : previous;
+    const winner = remoteAt > localAt ? event : previous;
     const loser = winner === event ? previous : event;
-    map.set(
-      event.id,
-      withMergedScores(
-        {
-          ...loser,
-          ...winner,
-          racesCount: Math.max(previous.racesCount || 0, event.racesCount || 0)
-        },
-        previous,
-        event,
-        idMap
-      )
-    );
+    const merged = withMergedScores({ ...loser, ...winner }, previous, event, idMap);
+    const racesCount = clampRacesCount(winner.racesCount);
+    map.set(event.id, {
+      ...merged,
+      ar: mergeRaceDoc(winner.ar, loser.ar),
+      ir: mergeRaceDoc(winner.ir, loser.ir),
+      racesCount,
+      discardsAllowed:
+        typeof winner.discardsAllowed === "number" && Number.isFinite(winner.discardsAllowed)
+          ? Math.min(Math.max(0, winner.discardsAllowed), Math.max(0, racesCount - 1))
+          : merged.discardsAllowed
+    });
   }
   return finalizeEvents([...map.values()], removedFechas);
 }

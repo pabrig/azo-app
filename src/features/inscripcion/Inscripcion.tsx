@@ -11,13 +11,17 @@ import {
   sailorsInFecha
 } from "../../domain/model";
 import { InscripcionView, type InscripcionDraft } from "./Inscripcion.view";
+import { AppModal } from "../../ui/AppModal";
+import { Field, controlClass } from "../../ui/primitives";
 import { useConfirm } from "../../ui/confirm";
+import type { Sailor } from "../../domain/types";
 
 export function Inscripcion() {
   const api = useChampionship();
   const confirm = useConfirm();
   const event = currentEvent(api.state);
   const classes = classNames(api.state);
+  const [editing, setEditing] = useState<Sailor | null>(null);
   const [draft, setDraft] = useState<InscripcionDraft>(() => ({
     sailNumber: "",
     boatClass: preferredClassName(api.state),
@@ -30,6 +34,7 @@ export function Inscripcion() {
   }));
 
   const categories = categoriesForClass(api.state, draft.boatClass);
+  const editCategories = categoriesForClass(api.state, editing?.boatClass || draft.boatClass);
 
   useEffect(() => {
     if (!classes.includes(draft.boatClass)) {
@@ -80,6 +85,7 @@ export function Inscripcion() {
     : [];
 
   return (
+    <>
     <InscripcionView
       draft={draft}
       classes={classes}
@@ -98,6 +104,10 @@ export function Inscripcion() {
         setDraft((current) => ({ ...current, ...patch }));
       }}
       onSubmit={onSubmit}
+      onEdit={(id) => {
+        const sailor = api.state.sailors.find((item) => item.id === id);
+        if (sailor) setEditing({ ...sailor });
+      }}
       onDelete={async (id) => {
         if (!api.isAdmin) {
           api.deleteSailor(id);
@@ -113,5 +123,118 @@ export function Inscripcion() {
         api.deleteSailor(id);
       }}
     />
+    <AppModal
+      open={Boolean(editing)}
+      size="wide"
+      title={editing?.name || "Inscripto"}
+      kicker="Editar"
+      onClose={() => setEditing(null)}
+      footer={
+        <>
+          <button type="button" className="app-modal-btn app-modal-btn--ghost" onClick={() => setEditing(null)}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="app-modal-btn app-modal-btn--primary"
+            onClick={() => {
+              if (!editing) return;
+              const category = editCategories.includes(editing.category)
+                ? editing.category
+                : editCategories[0] || "General";
+              if (
+                api.updateSailor({
+                  id: editing.id,
+                  sailNumber: editing.sailNumber,
+                  boatClass: editing.boatClass,
+                  name: editing.name,
+                  category,
+                  club: editing.club,
+                  celular: editing.celular,
+                  dni: editing.dni
+                })
+              ) {
+                setEditing(null);
+              }
+            }}
+          >
+            Guardar
+          </button>
+        </>
+      }
+    >
+      {editing ? (
+        <div className="space-y-2.5">
+          <Field label="Nº vela *">
+            <input
+              value={editing.sailNumber}
+              onChange={(event) => setEditing({ ...editing, sailNumber: event.target.value })}
+              className={controlClass}
+            />
+          </Field>
+          <Field label="Nombre *">
+            <input
+              value={editing.name}
+              onChange={(event) => setEditing({ ...editing, name: event.target.value })}
+              className={controlClass}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Field label="Clase">
+              <select
+                value={editing.boatClass}
+                onChange={(event) => setEditing({ ...editing, boatClass: event.target.value })}
+                className={controlClass}
+              >
+                {classes.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Categoría">
+              <select
+                value={editCategories.includes(editing.category) ? editing.category : editCategories[0] || ""}
+                onChange={(event) => setEditing({ ...editing, category: event.target.value })}
+                className={controlClass}
+              >
+                {editCategories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <Field label="Club">
+            <input
+              value={editing.club}
+              onChange={(event) => setEditing({ ...editing, club: event.target.value })}
+              className={controlClass}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Field label="Celular">
+              <input
+                type="tel"
+                value={editing.celular || ""}
+                onChange={(event) => setEditing({ ...editing, celular: event.target.value })}
+                className={controlClass}
+              />
+            </Field>
+            <Field label="DNI">
+              <input
+                inputMode="numeric"
+                value={editing.dni || ""}
+                onChange={(event) => setEditing({ ...editing, dni: event.target.value })}
+                className={controlClass}
+              />
+            </Field>
+          </div>
+        </div>
+      ) : null}
+    </AppModal>
+    </>
   );
 }

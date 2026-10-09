@@ -1,6 +1,12 @@
 import { createContext, useContext } from "react";
 import type { SyncMode, TabId } from "../domain/types";
-import type { ChampionshipState, ClassSaveInput, FechaSaveInput, RegisterInput } from "../domain/types";
+import type {
+  ChampionshipState,
+  ClassSaveInput,
+  FechaSaveInput,
+  RegisterInput,
+  SailorSaveInput
+} from "../domain/types";
 
 export type SyncStatus = { mode: SyncMode; label: string };
 
@@ -17,10 +23,12 @@ export type ChampionshipContextValue = {
   setFecha: (id: string) => void;
   setClassFilter: (className: string) => void;
   registerSailor: (input: RegisterInput) => void;
+  updateSailor: (input: SailorSaveInput) => boolean;
   deleteSailor: (id: string) => void;
   unlockAdmin: (pin: string) => boolean;
   addRace: () => void;
   removeRace: () => void;
+  setDiscardsAllowed: (count: number) => void;
   updateScore: (sailorId: string, raceIdx: number, value: string) => void;
   saveFecha: (input: FechaSaveInput) => boolean;
   deleteFecha: (id: string) => boolean;

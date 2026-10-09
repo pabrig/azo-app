@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { config } from "../config";
 import { createCloudSync, type CloudSync } from "../data/appwrite-sync";
 import { loadLocalState, persistLocal, readAdminSession, writeAdminSession } from "../data/local-store";
-import { mergeRemote } from "../domain/cloud";
+import { hasCloudChampionship, mergeRemote } from "../domain/cloud";
 import { boatClasses, currentEvent, isFechaRegistrationClosed } from "../domain/model";
 import {
   addRace,
@@ -16,9 +16,18 @@ import {
   saveWhatsapp,
   selectClassFilter,
   selectFecha,
+  setDiscardsAllowed as applyDiscardsAllowed,
+  updateSailor as applySailorUpdate,
   updateScore
 } from "../domain/mutations";
-import type { ChampionshipState, ClassSaveInput, FechaSaveInput, RegisterInput, TabId } from "../domain/types";
+import type {
+  ChampionshipState,
+  ClassSaveInput,
+  FechaSaveInput,
+  RegisterInput,
+  SailorSaveInput,
+  TabId
+} from "../domain/types";
 import {
   ChampionshipContext,
   type ChampionshipContextValue,
@@ -54,18 +63,24 @@ export function ChampionshipProvider({ children }: { children: ReactNode }) {
     if (cloud) syncRef.current?.schedule();
   }
 
-  function applyRemote(row: unknown) {
+  function applyState(next: ChampionshipState) {
     syncRef.current?.markApplying(true);
     try {
-      const next = mergeRemote(stateRef.current, row);
       stateRef.current = next;
       setState(next);
       const error = persistLocal(next);
       if (error) showToast(error);
-    } catch (error) {
-      console.warn(error);
     } finally {
       syncRef.current?.markApplying(false);
+    }
+  }
+
+  function applyRemote(row: unknown) {
+    if (!hasCloudChampionship(row)) return;
+    try {
+      applyState(mergeRemote(stateRef.current, row));
+    } catch (error) {
+      console.warn(error);
     }
   }
 
@@ -73,6 +88,7 @@ export function ChampionshipProvider({ children }: { children: ReactNode }) {
     const cloud = createCloudSync({
       getState: () => stateRef.current,
       applyRemote,
+      applyState,
       onStatus: (mode, label) => setSync({ mode, label })
     });
     syncRef.current = cloud;
@@ -124,6 +140,21 @@ export function ChampionshipProvider({ children }: { children: ReactNode }) {
         commit(result.state);
         showToast(result.toast);
       },
+      updateSailor(input: SailorSaveInput) {
+        if (!isAdmin) {
+          showToast("PIN de comisión requerido");
+          setTab("carga");
+          return false;
+        }
+        const result = applySailorUpdate(stateRef.current, input);
+        if (!result.state) {
+          showToast(result.error || "No se pudo guardar");
+          return false;
+        }
+        commit(result.state);
+        showToast("Inscripto actualizado");
+        return true;
+      },
       deleteSailor(id: string) {
         if (!isAdmin) {
           showToast("PIN de comisión requerido");
@@ -148,6 +179,9 @@ export function ChampionshipProvider({ children }: { children: ReactNode }) {
       },
       removeRace() {
         commit(removeRace(stateRef.current));
+      },
+      setDiscardsAllowed(count: number) {
+        commit(applyDiscardsAllowed(stateRef.current, count));
       },
       updateScore(sailorId: string, raceIdx: number, score: string) {
         commit(updateScore(stateRef.current, sailorId, raceIdx, score));
@@ -245,7 +279,6 @@ export function ChampionshipProvider({ children }: { children: ReactNode }) {
           setTab("carga");
           return;
         }
-        setTab("fechas");
         setWhatsappFocus((current) => current + 1);
       }
     };

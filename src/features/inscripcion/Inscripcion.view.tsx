@@ -24,6 +24,7 @@ export function InscripcionView({
   sailors,
   onChange,
   onSubmit,
+  onEdit,
   onDelete
 }: {
   draft: InscripcionDraft;
@@ -36,6 +37,7 @@ export function InscripcionView({
   sailors: { sailor: Sailor; fechas: string }[];
   onChange: (patch: Partial<InscripcionDraft>) => void;
   onSubmit: (event: FormEvent) => void;
+  onEdit: (id: string) => void;
   onDelete: (id: string) => void | Promise<void>;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
@@ -187,7 +189,12 @@ export function InscripcionView({
           ) : sailors.length ? (
             sailors.map(({ sailor, fechas: fechaText }) => (
               <div key={sailor.id} className="py-2.5 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  className="flex items-center gap-2 min-w-0 text-left flex-1 disabled:cursor-default"
+                  onClick={() => onEdit(sailor.id)}
+                  disabled={!isAdmin}
+                >
                   <span className="font-mono font-bold text-cyan-400 bg-sea-900 border border-white/10 px-2 py-1 rounded-lg text-[11px]">
                     {sailor.sailNumber}
                   </span>
@@ -205,7 +212,7 @@ export function InscripcionView({
                     ) : null}
                     <p className="text-[10px] text-cyan-400/80">{fechaText}</p>
                   </div>
-                </div>
+                </button>
                 {isAdmin ? (
                   <button type="button" onClick={() => onDelete(sailor.id)} className="text-slate-500 text-xs px-2">
                     ✕

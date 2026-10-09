@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { cloudPayload, cloudView, mergeClassesMeta, mergeRemote, syncFingerprint } from "./cloud";
+import { cloudPayload, cloudView, hasCloudChampionship, mergeClassesMeta, mergeRemote, syncFingerprint } from "./cloud";
 import { sameBoatClass } from "./class-names";
 import { canonicalBoatClassName, migrateChampionshipState } from "./migrate-championship";
 import { defaultState, isFechaRegistrationClosed, makeFecha, migrateClasses, migrateEvents } from "./model";
+import { cargaRacesCount } from "./race-slots";
 import { normalizeScoreEntry } from "./score-entry";
 import {
   dateNet,
   effectiveDiscardsAllowed,
   fechaResultsStarted,
   fleetSize,
+  formatRaceDiscardSummary,
   placaColumns,
   pointsFor,
   raceIndexesWithResults,
@@ -16,12 +18,17 @@ import {
   rankedOverall
 } from "./scoring";
 import {
+  addRace,
   deleteBoatClass,
   deleteFecha,
   registerSailor,
+  removeRace,
   removeSailor,
   saveBoatClass,
   saveFecha,
+  saveWhatsapp,
+  setDiscardsAllowed,
+  updateSailor,
   updateScore
 } from "./mutations";
 import type { ChampionshipState, Sailor } from "./types";
@@ -85,7 +92,7 @@ describe("puntaje low point", () => {
     expect(state.events[0].scores.s1?.[3]).toBe("DSQ");
   });
 
-  it("no descarta DSQ ni DNE aunque sean el peor puntaje", () => {
+  it("no descarta DSQ ni DNE cuando son el peor puntaje", () => {
     const state = defaultState();
     const fechaId = state.events[0].id;
     const sailor: Sailor = {
@@ -100,10 +107,23 @@ describe("puntaje low point", () => {
     state.sailors = [sailor, { ...sailor, id: "s2", sailNumber: "ARG 2", name: "Beto" }];
     state.events[0].racesCount = 4;
     state.events[0].discardsAllowed = 1;
-    state.events[0].scores.s1 = ["1", "2", "8", "DSQ"];
-    const net = dateNet(state, sailor, fechaId);
-    expect(net.discarded).toBe(8);
-    expect(net.net).toBe(6);
+    expect(pointsFor("DSQ", 2)).toBe(3);
+    expect(pointsFor("DNE", 2)).toBe(3);
+
+    for (const code of ["DSQ", "DNE"] as const) {
+      state.events[0].scores.s1 = ["1", "2", "1", code];
+      const net = dateNet(state, sailor, fechaId);
+      expect(net.racePts).toEqual([1, 2, 1, 3]);
+      expect(net.discarded).toBe(2);
+      expect(net.discardedRaceIndexes).toEqual([1]);
+      expect(net.net).toBe(5);
+    }
+
+    state.events[0].scores.s1 = ["1", "2", "1", "DNF"];
+    const dnf = dateNet(state, sailor, fechaId);
+    expect(dnf.racePts).toEqual([1, 2, 1, 3]);
+    expect(dnf.discarded).toBe(3);
+    expect(dnf.net).toBe(4);
   });
 
   it("desempata por RRS A8.1 (mejor regata) con igual puntaje neto en la fecha", () => {
@@ -183,6 +203,66 @@ describe("puntaje low point", () => {
     state = updateScore({ ...state, fecha: f2 }, "b", 0, "1");
     const ranked = rankedOverall(state);
     expect(ranked[0].net).toBe(ranked[1].net);
+    expect(ranked.map((item) => item.id)).toEqual(["b", "a"]);
+  });
+
+  it("el ranking del campeonato suma el neto de cada fecha sin descartar el DSQ", () => {
+    let state = defaultState();
+    const f1 = state.events[0].id;
+    state.events[0].racesCount = 3;
+    state.events[0].discardsAllowed = 1;
+    state = saveFecha(state, {
+      id: "",
+      name: "Fecha 2",
+      date: "2026-11-02",
+      time: "12:00",
+      avisos: ""
+    }).state!;
+    const f2 = state.events.find((event) => event.name === "Fecha 2")!.id;
+    state.events.find((event) => event.id === f2)!.racesCount = 1;
+    state.events.find((event) => event.id === f2)!.discardsAllowed = 0;
+    state = {
+      ...state,
+      sailors: [
+        {
+          id: "a",
+          sailNumber: "1",
+          boatClass: "ILCA 6",
+          name: "Ana",
+          category: "General",
+          club: "CNA",
+          fechas: [f1, f2]
+        },
+        {
+          id: "b",
+          sailNumber: "2",
+          boatClass: "ILCA 6",
+          name: "Beto",
+          category: "General",
+          club: "CNA",
+          fechas: [f1, f2]
+        }
+      ]
+    };
+    state.events.find((event) => event.id === f1)!.scores = {
+      a: ["1", "1", "DSQ"],
+      b: ["2", "2", "2"]
+    };
+    state.events.find((event) => event.id === f2)!.scores = {
+      a: ["2"],
+      b: ["1"]
+    };
+
+    const anaDate = dateNet(state, state.sailors[0], f1);
+    expect(anaDate.racePts).toEqual([1, 1, 3]);
+    expect(anaDate.discarded).toBe(1);
+    expect(anaDate.net).toBe(4);
+
+    const ranked = rankedOverall(state);
+    expect(ranked.find((item) => item.id === "a")?.breakdown).toEqual([4, 2]);
+    expect(ranked.find((item) => item.id === "a")?.net).toBe(6);
+    expect(ranked.find((item) => item.id === "b")?.breakdown).toEqual([4, 1]);
+    expect(ranked.find((item) => item.id === "b")?.net).toBe(5);
     expect(ranked.map((item) => item.id)).toEqual(["b", "a"]);
   });
 
@@ -388,6 +468,17 @@ describe("migrate championship", () => {
     expect(next.events[0].discardsAllowed).toBe(1);
     expect(report.some((line) => line.includes("descartes"))).toBe(true);
   });
+
+  it("hidratar o migrar no recorta las regatas que la comisión configuró", () => {
+    const state = defaultState();
+    state.events[0].racesCount = 6;
+    state.events[0].discardsAllowed = 1;
+    state.events[0].scores = { a: ["1", "2", "3", null, null, null] };
+    const { state: next } = migrateChampionshipState(state);
+    expect(next.events[0].racesCount).toBe(6);
+    expect(makeFecha(state.events[0]).racesCount).toBe(6);
+    expect(placaColumns(next.events[0])).toEqual(["R1", "R2", "R3"]);
+  });
 });
 
 describe("fechas y clases heredadas", () => {
@@ -543,6 +634,173 @@ describe("fechas y clases heredadas", () => {
     expect(merged.events.find((event) => event.id === fecha2Id)?.time).toBe("14:30");
   });
 
+  it("propaga regatas y descartes de una fecha aún sin resultados (Fecha 2)", () => {
+    let phoneA = defaultState();
+    phoneA = saveFecha(phoneA, {
+      id: "",
+      name: "Fecha 2",
+      date: "2026-11-14",
+      time: "12:00",
+      avisos: "",
+      racesCount: 5,
+      discardsAllowed: 1
+    }).state!;
+    const fecha2Id = phoneA.events.find((event) => event.name === "Fecha 2")!.id;
+    expect(phoneA.events.find((event) => event.id === fecha2Id)?.racesCount).toBe(5);
+
+    let phoneB = mergeRemote(defaultState(), cloudRow(phoneA));
+    expect(phoneB.events.find((event) => event.id === fecha2Id)?.racesCount).toBe(5);
+
+    phoneA = saveFecha(phoneA, {
+      id: fecha2Id,
+      name: "Fecha 2",
+      date: "2026-11-14",
+      time: "12:00",
+      avisos: "",
+      racesCount: 2,
+      discardsAllowed: 0
+    }).state!;
+    phoneB = mergeRemote(phoneB, cloudRow(phoneA));
+    const synced = phoneB.events.find((event) => event.id === fecha2Id);
+    expect(synced?.racesCount).toBe(2);
+    expect(synced?.discardsAllowed).toBe(0);
+
+    const stale = defaultState();
+    stale.events = [
+      ...stale.events,
+      {
+        ...phoneA.events.find((event) => event.id === fecha2Id)!,
+        racesCount: 3,
+        discardsAllowed: 1,
+        updatedAt: 1
+      }
+    ];
+    const recovered = mergeRemote(stale, cloudRow(phoneA));
+    expect(recovered.events.find((event) => event.id === fecha2Id)?.racesCount).toBe(2);
+  });
+
+  it("editar regatas de una fecha con resultados se ve en el FE y sobrevive el sync", () => {
+    let state = defaultState();
+    const fechaId = state.events[0].id;
+    state.events[0] = {
+      ...state.events[0],
+      racesCount: 3,
+      discardsAllowed: 1,
+      scores: { s1: ["1", "2", "3"] },
+      updatedAt: 10
+    };
+    state = saveFecha(state, {
+      id: fechaId,
+      name: state.events[0].name,
+      date: state.events[0].date,
+      time: state.events[0].time,
+      avisos: state.events[0].avisos || "",
+      racesCount: 5,
+      discardsAllowed: 1
+    }).state!;
+    expect(state.events[0].racesCount).toBe(5);
+    expect(formatRaceDiscardSummary(state.events[0]).line).toContain("5 previstas");
+
+    const fromCloud = mergeRemote(defaultState(), cloudRow(state));
+    expect(fromCloud.events[0].racesCount).toBe(5);
+    expect(makeFecha(JSON.parse(cloudRow(state).events as string).fechas[0]).racesCount).toBe(5);
+
+    const bounced = mergeRemote(state, cloudRow(fromCloud));
+    expect(bounced.events[0].racesCount).toBe(5);
+    expect(placaColumns(bounced.events[0])).toEqual(["R1", "R2", "R3"]);
+  });
+
+  it("cargar puntos no pisa regatas, avisos ni AR/IR de la otra comisión", () => {
+    let fechaMeta = defaultState();
+    const fechaId = fechaMeta.events[0].id;
+    fechaMeta = saveFecha(fechaMeta, {
+      id: fechaId,
+      name: "Fecha 1",
+      date: "2026-11-01",
+      time: "12:00",
+      avisos: "Aviso norte",
+      racesCount: 3,
+      discardsAllowed: 1,
+      ar: { name: "AR.pdf", dataUrl: "data:application/pdf;base64,AAA" },
+      ir: { name: "IR.pdf", dataUrl: "data:application/pdf;base64,BBB" }
+    }).state!;
+
+    let carga = mergeRemote(defaultState(), cloudRow(fechaMeta));
+    carga = updateScore({ ...carga, fecha: fechaId }, "s1", 0, "2");
+    carga = updateScore({ ...carga, fecha: fechaId }, "s1", 1, "4");
+
+    const fromCarga = mergeRemote(fechaMeta, cloudRow(carga));
+    expect(fromCarga.events[0]).toMatchObject({
+      racesCount: 3,
+      avisos: "Aviso norte",
+      scores: { s1: ["2", "4"] }
+    });
+    expect(fromCarga.events[0].ar.dataUrl).toContain("AAA");
+    expect(fromCarga.events[0].ir.dataUrl).toContain("BBB");
+
+    const fromMeta = mergeRemote(carga, cloudRow(fechaMeta));
+    expect(fromMeta.events[0].ar.dataUrl).toContain("AAA");
+    expect(fromMeta.events[0].ir.dataUrl).toContain("BBB");
+    expect(fromMeta.events[0].scores.s1).toEqual(["2", "4"]);
+  });
+
+  it("puntos de Fecha 1 no revierten las regatas de Fecha 2", () => {
+    let phoneA = defaultState();
+    phoneA = saveFecha(phoneA, {
+      id: "",
+      name: "Fecha 2",
+      date: "2026-11-14",
+      time: "12:00",
+      avisos: "",
+      racesCount: 2,
+      discardsAllowed: 0
+    }).state!;
+    const fecha2Id = phoneA.events.find((event) => event.name === "Fecha 2")!.id;
+
+    let phoneB = mergeRemote(defaultState(), cloudRow(phoneA));
+    phoneB = updateScore({ ...phoneB, fecha: phoneB.events[0].id }, "s1", 0, "3");
+
+    phoneA = mergeRemote(phoneA, cloudRow(phoneB));
+    expect(phoneA.events.find((event) => event.id === fecha2Id)?.racesCount).toBe(2);
+    expect(phoneA.events[0].scores.s1?.[0]).toBe("3");
+  });
+
+  it("el WhatsApp de comisión no vuelve al default al sincronizar", () => {
+    const saved = saveWhatsapp(defaultState(), "https://chat.whatsapp.com/ABC123");
+    const local = saved.state!;
+    expect(local.whatsappUrl).toContain("ABC123");
+
+    const againstDefault = mergeRemote(local, cloudRow(defaultState()));
+    expect(againstDefault.whatsappUrl).toContain("ABC123");
+    expect(againstDefault.whatsappAt).toBeGreaterThan(0);
+
+    const packed = JSON.parse(cloudRow(local).events as string) as { whatsappAt?: number; whatsappUrl?: string };
+    expect(packed.whatsappAt).toBeGreaterThan(0);
+    expect(packed.whatsappUrl).toContain("ABC123");
+
+    const otherPhone = mergeRemote(defaultState(), cloudRow(local));
+    expect(otherPhone.whatsappUrl).toContain("ABC123");
+  });
+
+  it("un payload de Appwrite sin events no reinyecta la fecha semilla", () => {
+    const created = saveFecha(defaultState(), {
+      id: "",
+      name: "Fecha 2",
+      date: "2026-11-14",
+      time: "12:00",
+      avisos: "",
+      racesCount: 2,
+      discardsAllowed: 0
+    });
+    const state = created.state!;
+    expect(state.events).toHaveLength(2);
+    expect(hasCloudChampionship({ $id: "champ", sailors: "[]" })).toBe(false);
+    expect(hasCloudChampionship(cloudRow(state))).toBe(true);
+    const merged = mergeRemote(state, { $id: "champ", sailors: "[]" });
+    expect(merged.events).toHaveLength(2);
+    expect(merged.events.map((event) => event.name)).toEqual(state.events.map((event) => event.name));
+  });
+
   it("conserva resultados al editar una fecha", () => {
     let state = defaultState();
     const fechaId = state.events[0].id;
@@ -600,6 +858,121 @@ describe("fechas y clases heredadas", () => {
     expect(merged.events[0].scores.a?.[0]).toBe("1");
     expect(rankedForFecha(merged, fechaId)[0].net).toBe(1);
     expect(rankedOverall(merged)[0].net).toBe(1);
+  });
+
+  it("la comisión cambia descartes de la fecha activa", () => {
+    let state = defaultState();
+    state.events[0].racesCount = 3;
+    state.events[0].discardsAllowed = 1;
+    state = setDiscardsAllowed(state, 2);
+    expect(state.events[0].discardsAllowed).toBe(2);
+    state = setDiscardsAllowed(state, 9);
+    expect(state.events[0].discardsAllowed).toBe(2);
+  });
+
+  it("columnas vacías de más no inflan placa ni ranking; Carga sigue la cantidad editada", () => {
+    const scores = { a: ["1", "2", "3", null, null, null] };
+    expect(cargaRacesCount({ scores, racesCount: 6 })).toBe(3);
+    expect(makeFecha({ scores, racesCount: 6, discardsAllowed: 1 }).racesCount).toBe(6);
+
+    let state = defaultState();
+    const fechaId = state.events[0].id;
+    state.sailors = [
+      {
+        id: "a",
+        sailNumber: "1",
+        boatClass: "ILCA 6",
+        name: "Ana",
+        category: "General",
+        club: "CNA",
+        fechas: [fechaId]
+      }
+    ];
+    state.events[0] = {
+      ...state.events[0],
+      racesCount: 6,
+      discardsAllowed: 1,
+      scores
+    };
+    expect(formatRaceDiscardSummary(state.events[0]).line).toBe("3 regatas en placa · 6 previstas · 1 descarte");
+    expect(placaColumns(state.events[0])).toEqual(["R1", "R2", "R3"]);
+    expect(dateNet(state, state.sailors[0], fechaId).net).toBe(3);
+
+    state = addRace(state);
+    expect(state.events[0].racesCount).toBe(6);
+
+    state = removeRace(state);
+    expect(state.events[0].racesCount).toBe(5);
+
+    const saved = saveFecha(state, {
+      id: fechaId,
+      name: state.events[0].name,
+      date: state.events[0].date,
+      time: state.events[0].time,
+      avisos: "",
+      racesCount: 3,
+      discardsAllowed: 1
+    }).state!;
+    expect(saved.events[0].racesCount).toBe(3);
+    expect(saved.events[0].scores.a).toEqual(["1", "2", "3"]);
+  });
+
+  it("el sync no revive 6 columnas vacías si solo hay 3 regatas cargadas", () => {
+    const local = defaultState();
+    local.events[0] = {
+      ...local.events[0],
+      racesCount: 3,
+      discardsAllowed: 1,
+      scores: { a: ["1", "2", "3"] },
+      updatedAt: 20
+    };
+    const remote = defaultState();
+    remote.events[0] = {
+      ...remote.events[0],
+      racesCount: 6,
+      discardsAllowed: 1,
+      scores: { a: ["1", "2", "3"] },
+      updatedAt: 10
+    };
+    const merged = mergeRemote(local, cloudRow(remote));
+    expect(merged.events[0].racesCount).toBe(3);
+  });
+});
+
+describe("edición de inscripto", () => {
+  it("actualiza vela, clase, celular y DNI sin perder fechas", () => {
+    let state = defaultState();
+    const fecha = state.events[0].id;
+    state = registerSailor(state, {
+      sailNumber: "1",
+      boatClass: "ILCA 6",
+      name: "Ana Gómez",
+      category: "General",
+      club: "CNA",
+      celular: "111",
+      dni: "123",
+      fecha
+    }).state;
+    const id = state.sailors[0].id;
+    const result = updateSailor(state, {
+      id,
+      sailNumber: "99",
+      boatClass: "ILCA 7",
+      name: "Ana Gómez",
+      category: "Master",
+      club: "YCA",
+      celular: "222",
+      dni: "12.345.678"
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.state!.sailors[0]).toMatchObject({
+      sailNumber: "99",
+      boatClass: "ILCA 7",
+      club: "YCA",
+      celular: "222",
+      dni: "12345678",
+      fechas: [fecha]
+    });
   });
 });
 

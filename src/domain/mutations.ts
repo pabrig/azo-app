@@ -9,8 +9,17 @@ import {
   sailorFechas,
   uid
 } from "./model";
+import { applyRacesCount, clampRacesCount, MAX_RACES } from "./race-slots";
+import { raceIndexesWithResults } from "./scoring";
 import { normalizeScoreEntry } from "./score-entry";
-import type { ChampionshipState, ClassSaveInput, Fecha, FechaSaveInput, RegisterInput } from "./types";
+import type {
+  ChampionshipState,
+  ClassSaveInput,
+  Fecha,
+  FechaSaveInput,
+  RegisterInput,
+  SailorSaveInput
+} from "./types";
 
 export function selectFecha(state: ChampionshipState, id: string): ChampionshipState {
   if (!state.events.some((event) => event.id === id)) return state;
@@ -32,7 +41,10 @@ function optionalDni(value: string | undefined) {
   return digits || trimmed;
 }
 
-function contactFromInput(input: RegisterInput, existing?: { celular?: string; dni?: string }) {
+function contactFromInput(
+  input: { celular?: string; dni?: string },
+  existing?: { celular?: string; dni?: string }
+) {
   const celular = optionalCelular(input.celular) || optionalCelular(existing?.celular);
   const dni = optionalDni(input.dni) || optionalDni(existing?.dni);
   return {
@@ -143,14 +155,48 @@ export function removeSailor(state: ChampionshipState, id: string): Championship
   };
 }
 
+export function updateSailor(
+  state: ChampionshipState,
+  input: SailorSaveInput
+): { state?: ChampionshipState; error?: string } {
+  const existing = state.sailors.find((sailor) => sailor.id === input.id);
+  if (!existing) return { error: "No encontramos a esa persona" };
+  const sailNumber = input.sailNumber.trim().toUpperCase();
+  const name = input.name.trim();
+  if (!sailNumber) return { error: "Falta el número de vela" };
+  if (!name) return { error: "Falta el nombre" };
+  const club = input.club.trim().toUpperCase() || "CNA";
+  const contact = contactFromInput(input, existing);
+  return {
+    state: {
+      ...state,
+      sailors: state.sailors.map((sailor) =>
+        sailor.id === existing.id
+          ? {
+              ...sailor,
+              sailNumber,
+              boatClass: input.boatClass,
+              name,
+              category: input.category,
+              club,
+              celular: contact.celular,
+              dni: contact.dni,
+              updatedAt: Date.now()
+            }
+          : sailor
+      )
+    }
+  };
+}
+
 export function addRace(state: ChampionshipState): ChampionshipState {
   const current = state.events.find((event) => event.id === state.fecha) || state.events[0];
-  if (!current) return state;
+  if (!current || clampRacesCount(current.racesCount) >= MAX_RACES) return state;
   return {
     ...state,
     events: state.events.map((event) => {
       if (event.id !== current.id) return event;
-      const racesCount = event.racesCount + 1;
+      const racesCount = Math.min(MAX_RACES, clampRacesCount(event.racesCount) + 1);
       const maxDiscards = Math.max(0, racesCount - 1);
       const discardsAllowed = Math.min(event.discardsAllowed ?? 0, maxDiscards);
       return { ...event, racesCount, discardsAllowed, updatedAt: Date.now() };
@@ -160,8 +206,9 @@ export function addRace(state: ChampionshipState): ChampionshipState {
 
 export function removeRace(state: ChampionshipState): ChampionshipState {
   const current = state.events.find((event) => event.id === state.fecha) || state.events[0];
-  if (!current || current.racesCount <= 1) return state;
-  const racesCount = current.racesCount - 1;
+  const currentCount = current ? clampRacesCount(current.racesCount) : 0;
+  if (!current || currentCount <= 1) return state;
+  const racesCount = currentCount - 1;
   return {
     ...state,
     events: state.events.map((event) => {
@@ -175,6 +222,22 @@ export function removeRace(state: ChampionshipState): ChampionshipState {
       const discardsAllowed = Math.min(event.discardsAllowed ?? 0, maxDiscards);
       return { ...event, racesCount, discardsAllowed, scores, updatedAt: Date.now() };
     })
+  };
+}
+
+export function setDiscardsAllowed(state: ChampionshipState, count: number): ChampionshipState {
+  const current = state.events.find((event) => event.id === state.fecha) || state.events[0];
+  if (!current) return state;
+  const raced = raceIndexesWithResults(current).length;
+  const slots = clampRacesCount(current.racesCount);
+  const max = Math.max(0, (raced || slots) - 1);
+  const discardsAllowed = Math.min(Math.max(0, Math.floor(count)), max);
+  if (discardsAllowed === current.discardsAllowed) return state;
+  return {
+    ...state,
+    events: state.events.map((event) =>
+      event.id === current.id ? { ...event, discardsAllowed, updatedAt: Date.now() } : event
+    )
   };
 }
 
@@ -197,8 +260,7 @@ export function updateScore(
       return {
         ...event,
         scores: { ...event.scores, [sailorId]: previous },
-        scoreAt: { ...(event.scoreAt || {}), [sailorId]: now },
-        updatedAt: now
+        scoreAt: { ...(event.scoreAt || {}), [sailorId]: now }
       };
     })
   };
@@ -219,27 +281,30 @@ export function saveFecha(
   if (others.some((event) => event.date === input.date)) {
     return { error: "Ya hay una fecha cargada para ese día" };
   }
-  const next = makeFecha({
+  const racesCount = input.racesCount ?? existing?.racesCount;
+  const drafted = makeFecha({
     ...(existing || {}),
     id: existing?.id || uid(),
     name,
     date: input.date,
     time: input.time,
     avisos: input.avisos.trim(),
+    racesCount,
     discardsAllowed: input.discardsAllowed ?? existing?.discardsAllowed,
     ar: input.ar || existing?.ar,
     ir: input.ir || existing?.ir,
-    updatedAt: Date.now()
+    updatedAt: Math.max(Date.now(), (existing?.updatedAt || 0) + 1)
   });
+  const next = applyRacesCount(drafted, racesCount ?? drafted.racesCount);
   const events = existing
     ? state.events.map((event) =>
         event.id === next.id
           ? {
               ...existing,
               ...next,
-              scores: existing.scores,
+              scores: next.scores,
               scoreAt: existing.scoreAt,
-              racesCount: existing.racesCount,
+              racesCount: next.racesCount,
               discardsAllowed: next.discardsAllowed
             }
           : event
@@ -277,7 +342,7 @@ export function saveWhatsapp(state: ChampionshipState, rawUrl: string): { state?
   if (!/chat\.whatsapp\.com/i.test(url)) {
     return { error: "Usá un link de grupo chat.whatsapp.com" };
   }
-  return { state: { ...state, whatsappUrl: url, whatsappAt: Date.now() } };
+  return { state: { ...state, whatsappUrl: url, whatsappAt: Math.max(Date.now(), (state.whatsappAt || 0) + 1) } };
 }
 
 export function saveBoatClass(

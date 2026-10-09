@@ -1,14 +1,14 @@
 /** Mantener alineado con `package.json` → version y `CHANGELOG.md` */
-export const APP_VERSION = "2.2.0";
+export const APP_VERSION = "2.3.0";
 
 /** Texto para el usuario final; una línea = un cambio visible. */
 export const CURRENT_RELEASE_NOTES = [
   "Placa y Ranking por clase: elegís ILCA 6, ILCA 7, Optimist, etc. (ya no «Todas»).",
   "Solo ves fechas y regatas con resultados cargados por la comisión; nada de DNC «fantasma» antes de la regata.",
-  "Descartes: en fechas de 3 regatas, 1 descarte por defecto; en la tabla se marca (desc.).",
-  "Carga: opción Descalificado (DSQ) y misma leyenda que en la placa.",
+  "Fechas: la comisión elige cuántas regatas y cuántos descartes. Placa y ranking usan solo las que tienen resultado.",
+  "Clima de la fecha: viento, ráfagas y temperatura según la hora de largada.",
+  "Carga: penalizaciones con la sigla (DNC, DSQ, …) y la misma leyenda (desc.) que en la placa.",
   "Clases unificadas ILCA 6 / ILCA 7 (compatible con datos viejos «Laser radial/std»).",
-  "Interfaz renovada: filtros de clase, tablas más claras y navegación en desktop.",
-  "Inscripción: no podés anotarte en fechas pasadas; podés ver inscriptos y documentos.",
-  "Ranking y placa se consultan en la app; si hace falta, hay un enlace discreto para descargar PDF.",
+  "Inscripción: no podés anotarte en fechas pasadas. La comisión puede corregir vela, clase, nombre, club, celular y DNI.",
+  "Entre celulares no se pisan el WhatsApp del grupo ni los PDF de instrucciones (AR/IR).",
 ] as const;

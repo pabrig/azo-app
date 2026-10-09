@@ -3,6 +3,7 @@ import { isDevHost } from "../../app/dev-host";
 import { CanalOficial } from "../canal/CanalOficial";
 import { downloadDoc } from "../../data/download-doc";
 import { currentEvent } from "../../domain/model";
+import { fechaResultsStarted } from "../../domain/scoring";
 import { FechaBriefCard } from "../fecha/FechaBriefCard";
 import { Carga } from "../carga/Carga";
 import { Fechas } from "../fechas/Fechas";
@@ -20,7 +21,9 @@ export function AppShell() {
       toast={api.toast}
       tab={api.tab}
       showFechaBar={api.tab !== "ranking"}
-      events={api.state.events}
+      events={
+        api.tab === "placa" ? api.state.events.filter(fechaResultsStarted) : api.state.events
+      }
       activeFechaId={api.state.fecha}
       onSelectFecha={api.setFecha}
       showSync={isDevHost()}

@@ -5,6 +5,7 @@ import {
   sailorFechas,
   sailorsInFecha
 } from "./model";
+import { clampRacesCount } from "./race-slots";
 import { canonicalScoreCell, normalizeScoreEntry } from "./score-entry";
 import {
   NON_DISCARDABLE_PENALTIES,
@@ -40,6 +41,29 @@ export function fechaResultsStarted(event: Pick<Fecha, "scores">) {
 
 export function placaColumns(event: Fecha) {
   return raceIndexesWithResults(event).map((index) => `R${index + 1}`);
+}
+
+/** Descartes que aplican placa/ranking: sobre regatas con resultado, no sobre columnas vacías. */
+export function publishedDiscardsAllowed(event: Fecha) {
+  const raced = raceIndexesWithResults(event).length;
+  const columns = clampRacesCount(event.racesCount);
+  return effectiveDiscardsAllowed({ ...event, racesCount: raced || columns });
+}
+
+/** Texto vivo para Fechas/Carga: cuántas regatas entran a placa y cuántos descartes. */
+export function formatRaceDiscardSummary(event: Fecha) {
+  const raced = raceIndexesWithResults(event).length;
+  const columns = clampRacesCount(event.racesCount);
+  const discards = publishedDiscardsAllowed(event);
+  const discardLabel =
+    discards === 0 ? "sin descarte" : discards === 1 ? "1 descarte" : `${discards} descartes`;
+  if (!raced) {
+    const planned = columns === 1 ? "1 regata prevista" : `${columns} regatas previstas`;
+    return { raced: 0, columns, discards, line: `${planned} · ${discardLabel} · sin placa todavía` };
+  }
+  const racesLabel = raced === 1 ? "1 regata en placa" : `${raced} regatas en placa`;
+  const plannedNote = columns > raced ? ` · ${columns} previstas` : "";
+  return { raced, columns, discards, line: `${racesLabel}${plannedNote} · ${discardLabel}` };
 }
 
 /** Texto publicado en placa/carga (p. ej. `DNC (desc.)`). */
@@ -201,6 +225,7 @@ export function rankedForFecha(state: ChampionshipState, fechaKey: string): Rank
   return rankedForFechaInScope(state, fechaKey);
 }
 
+/** Suma los netos de cada fecha: mismos descartes y las mismas exclusiones (DSQ y DNE no se descartan). */
 function rankedOverallInScope(state: ChampionshipState): OverallSailor[] {
   const ids = fechasWithResults(state).map((event) => event.id);
   return filteredSailors(state, null)
