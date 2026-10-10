@@ -25,13 +25,18 @@ const tdBody = `${td} text-slate-300`;
 
 export function ResultsCard({
   title,
+  titleLine1,
+  titleLine2,
   classLabel,
   year,
   stamp,
   columns,
   rows
 }: {
+  /** Título PDF / accesibilidad (completo). */
   title: string;
+  titleLine1: string;
+  titleLine2?: string;
   classLabel: string;
   year: string;
   stamp: string;
@@ -40,20 +45,26 @@ export function ResultsCard({
 }) {
   const colSpan = 5 + columns.length;
   return (
-    <div className="results-card bg-sea-800 rounded-xl p-2.5 sm:p-3 lg:p-4 border border-white/10 space-y-2 lg:space-y-3">
-      <div className="results-card__head flex items-start justify-between gap-1.5 border-b border-white/10 pb-2 lg:pb-3">
-        <div className="flex items-center gap-2 lg:gap-3 min-w-0">
+    <div className="results-card bg-sea-800 rounded-xl p-2 sm:p-3 lg:p-4 border border-white/10 space-y-1.5 lg:space-y-3">
+      <div className="results-card__head flex items-start justify-between gap-1 border-b border-white/10 pb-1.5 lg:pb-3">
+        <div className="flex items-center gap-1.5 lg:gap-3 min-w-0">
           <img
             src="/assets/cna-insignia.png"
             alt=""
-            className="h-9 w-9 lg:h-10 lg:w-10 shrink-0 rounded-md object-cover bg-white"
+            className="h-8 w-8 lg:h-10 lg:w-10 shrink-0 rounded-md object-cover bg-white"
           />
           <div className="min-w-0">
             <p className="text-[9px] lg:text-[10px] uppercase tracking-widest text-cyan-400 font-bold leading-none">
               Club Náutico Azopardo
             </p>
-            <h2 className="font-black text-sm sm:text-base lg:text-lg leading-tight mt-0.5">{title}</h2>
-            <p className="text-[10px] lg:text-xs text-slate-400 line-clamp-2 lg:line-clamp-1 leading-tight">{classLabel}</p>
+            <h2 className="sr-only">{title}</h2>
+            <p className="results-card__title mt-0.5" aria-hidden="true">
+              <span className="results-card__title-line1">{titleLine1}</span>
+              {titleLine2 ? <span className="results-card__title-line2">{titleLine2}</span> : null}
+            </p>
+            <p className="text-[10px] lg:text-xs text-slate-400 line-clamp-2 lg:line-clamp-1 leading-snug mt-0.5">
+              {classLabel}
+            </p>
           </div>
         </div>
         <span className="text-[10px] lg:text-xs font-mono bg-sea-900 border border-white/10 px-1.5 py-0.5 rounded shrink-0">

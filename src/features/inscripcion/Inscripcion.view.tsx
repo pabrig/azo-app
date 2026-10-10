@@ -140,7 +140,7 @@ export function InscripcionView({
             />
           </Field>
         </div>
-        <Field label="Fecha *">
+        <Field label="Ver información de *">
           <select
             required
             value={draft.fecha}
@@ -154,6 +154,10 @@ export function InscripcionView({
               </option>
             ))}
           </select>
+          <p className="mt-1.5 text-[11px] text-slate-400 leading-snug">
+            Al entrar se muestra la <strong className="font-semibold text-slate-300">próxima fecha</strong>; podés
+            cambiarla para ver avisos, AR/IR u otras fechas. La inscripción incluye todo el campeonato.
+          </p>
         </Field>
         <button
           type="submit"

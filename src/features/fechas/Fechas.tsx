@@ -64,7 +64,7 @@ export function Fechas() {
       if (occupied > fechaForm.racesCount) {
         const ok = await confirm({
           title: "Quitar regatas",
-          message: `Esta fecha ya tiene ${occupied} regatas con resultado. Si dejás ${fechaForm.racesCount}, se borran las últimas columnas y placa/ranking se recalculan. No se puede deshacer.`,
+          message: `Esta fecha ya tiene ${occupied} regatas con resultado. Si dejás ${fechaForm.racesCount}, se borran las últimas columnas y las clasificaciones se recalculan. No se puede deshacer.`,
           confirmLabel: "Guardar",
           danger: true
         });

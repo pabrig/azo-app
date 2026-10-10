@@ -77,7 +77,7 @@ export function CargaView({
         <div className="rounded-xl border border-white/10 bg-sea-900/50 px-3 py-2.5 space-y-1.5">
           <p className="text-[13px] font-semibold text-cyan-300 leading-snug">{summaryLine}</p>
           <p className="text-[11px] text-slate-400 leading-relaxed">
-            Tocá una celda para cargar o corregir. Placa y ranking se actualizan al momento. La cantidad de regatas y
+            Tocá una celda para cargar o corregir. Clasificación Fecha y Final se actualizan al momento. La cantidad de regatas y
             descartes se edita en Fechas, en cada fecha.
           </p>
         </div>

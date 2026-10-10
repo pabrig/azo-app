@@ -72,14 +72,6 @@ export function FechaWeatherStrip({
       <div className="fecha-weather-panel">
         <p className="text-center text-[10px] text-slate-400 leading-snug px-2">
           {error}
-          {onRetry ? (
-            <>
-              {" "}
-              <button type="button" onClick={onRetry} className="text-cyan-400 underline underline-offset-2">
-                Reintentar
-              </button>
-            </>
-          ) : null}
         </p>
       </div>
     );

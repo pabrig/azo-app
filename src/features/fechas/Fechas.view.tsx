@@ -88,7 +88,7 @@ export function FechasView({
         <div className="space-y-1 min-w-0">
           <h1 className="text-lg font-bold tracking-tight">Fechas del campeonato</h1>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Día, hora, regatas, descartes y AR/IR. Placa y ranking solo publican una fecha cuando hay resultados cargados.
+            Día, hora, regatas, descartes y AR/IR. Clasificación Fecha y Final solo publican una fecha cuando hay resultados cargados.
           </p>
         </div>
         {isAdmin ? (
@@ -401,7 +401,7 @@ function FechaFields({
         </Field>
       </div>
       <p className="text-[10px] text-slate-500 leading-relaxed -mt-1">
-        Misma regla para las dos: se guardan en esta fecha. Placa y ranking usan solo las regatas con resultado. Con 3 o
+        Misma regla para las dos: se guardan en esta fecha. Las clasificaciones usan solo las regatas con resultado. Con 3 o
         más, el campeonato usa 1 descarte salvo que elijas otro.
       </p>
       <Field label="Avisos (TOA)">

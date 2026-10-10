@@ -1,5 +1,6 @@
 import { defaultBoatClasses, DEFAULT_WHATSAPP } from "./defaults";
 import { applyCanonicalClassNames } from "./migrate-championship";
+import { alignSailorsToChampionshipFechas, upcomingFechaId } from "./model";
 import {
   applyRemovedFechas,
   boatClasses,
@@ -182,7 +183,7 @@ export function cloudView(row: unknown): ChampionshipState {
     removedSailors: parsed.removedSailors,
     removedFechas: parsed.removedFechas,
     classesAt: parsed.classesAt,
-    fecha: events[0]?.id || ""
+    fecha: upcomingFechaId(events)
   };
 }
 
@@ -228,8 +229,7 @@ export function mergeRemote(state: ChampionshipState, row: unknown): Championshi
   );
   const removedFechas = mergeRemovedFechas(state.removedFechas, parsed.removedFechas);
   const events = mergeEvents(state.events, parsed.events, idMap, removedFechas);
-  const fecha = events.some((event) => event.id === state.fecha) ? state.fecha : events[0]?.id || "";
-  return applyCanonicalClassNames({
+  const merged = applyCanonicalClassNames({
     ...state,
     sailors,
     removedSailors,
@@ -237,8 +237,9 @@ export function mergeRemote(state: ChampionshipState, row: unknown): Championshi
     events,
     ...pickWhatsapp(state.whatsappUrl, state.whatsappAt || 0, parsed.whatsappUrl, parsed.whatsappAt || 0),
     ...mergeClassesMeta(state.classes, state.classesAt || 0, parsed.classes, parsed.classesAt || 0),
-    fecha
+    fecha: events.some((event) => event.id === state.fecha) ? state.fecha : upcomingFechaId(events)
   });
+  return alignSailorsToChampionshipFechas(merged);
 }
 
 function asCloudRow(row: unknown): CloudRow | null {
