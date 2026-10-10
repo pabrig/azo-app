@@ -8,7 +8,6 @@ import {
   officialWhatsApp,
   personKey,
   removalMatches,
-  sailorFechas,
   upcomingFechaId,
   uid
 } from "./model";
@@ -120,14 +119,6 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
     ),
     toast: `Inscripción al campeonato · ${championshipFechas.length} fecha(s)`
   };
-}
-
-function label(state: ChampionshipState, id: string) {
-  const event = state.events.find((item) => item.id === id);
-  if (!event) return id;
-  if (!event.date) return event.name;
-  const [year, month, day] = event.date.split("-");
-  return `${event.name} (${day}/${month}/${year})`;
 }
 
 export function removeSailor(state: ChampionshipState, id: string): ChampionshipState {
