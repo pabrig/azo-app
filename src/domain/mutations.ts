@@ -1,12 +1,14 @@
 import { normalizeClassCategories } from "./defaults";
 import {
+  alignSailorsToChampionshipFechas,
+  allChampionshipFechaIds,
   boatClasses,
   fechaKey,
   makeFecha,
   officialWhatsApp,
   personKey,
   removalMatches,
-  sailorFechas,
+  upcomingFechaId,
   uid
 } from "./model";
 import { applyRacesCount, clampRacesCount, MAX_RACES } from "./race-slots";
@@ -60,10 +62,10 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
   const person = { sailNumber, boatClass: input.boatClass, name };
   const removedSailors = state.removedSailors.filter((stamp) => !removalMatches(stamp, person));
   const updatedAt = Date.now();
+  const championshipFechas = allChampionshipFechaIds(state.events);
+  const focusFecha = upcomingFechaId(state.events);
   const existing = state.sailors.find((sailor) => personKey(sailor) === personKey(person));
   if (existing) {
-    const fechas = sailorFechas(existing, state.events);
-    const nextFechas = fechas.includes(input.fecha) ? fechas.slice() : [...fechas, input.fecha];
     const contact = contactFromInput(input, existing);
     return {
       state: selectFecha(
@@ -81,15 +83,15 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
                   club,
                   celular: contact.celular,
                   dni: contact.dni,
-                  fechas: nextFechas,
+                  fechas: championshipFechas,
                   updatedAt
                 }
               : sailor
           )
         },
-        input.fecha
+        focusFecha
       ),
-      toast: `Inscripto en ${label(state, input.fecha)}`
+      toast: `Inscripto al campeonato · ${championshipFechas.length} fecha(s)`
     };
   }
   const contact = contactFromInput(input);
@@ -108,23 +110,15 @@ export function registerSailor(state: ChampionshipState, input: RegisterInput): 
             category: input.category,
             club,
             ...contact,
-            fechas: [input.fecha],
+            fechas: championshipFechas,
             updatedAt
           }
         ]
       },
-      input.fecha
+      focusFecha
     ),
-    toast: `Inscripción confirmada · ${label(state, input.fecha)}`
+    toast: `Inscripción al campeonato · ${championshipFechas.length} fecha(s)`
   };
-}
-
-function label(state: ChampionshipState, id: string) {
-  const event = state.events.find((item) => item.id === id);
-  if (!event) return id;
-  if (!event.date) return event.name;
-  const [year, month, day] = event.date.split("-");
-  return `${event.name} (${day}/${month}/${year})`;
 }
 
 export function removeSailor(state: ChampionshipState, id: string): ChampionshipState {
@@ -312,7 +306,10 @@ export function saveFecha(
     : [...state.events, next];
   events.sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
   const removedFechas = state.removedFechas.filter((stamp) => stamp.id !== next.id);
-  return { state: { ...state, events, fecha: next.id, removedFechas } };
+  const nextState = { ...state, events, fecha: next.id, removedFechas };
+  return {
+    state: existing ? nextState : alignSailorsToChampionshipFechas(nextState)
+  };
 }
 
 export function deleteFecha(state: ChampionshipState, id: string): ChampionshipState | null {
@@ -321,12 +318,13 @@ export function deleteFecha(state: ChampionshipState, id: string): ChampionshipS
   if (!target) return null;
   const at = Math.max(Date.now(), (target.updatedAt || 0) + 1);
   const events = state.events.filter((event) => event.id !== id);
-  const sailors = state.sailors.map((sailor) => {
-    const fechas = sailorFechas(sailor, state.events);
-    if (!fechas.includes(id)) return sailor;
-    return { ...sailor, fechas: fechas.filter((fechaId) => fechaId !== id), updatedAt: at };
-  });
-  const fecha = state.fecha === id ? events[0].id : state.fecha;
+  const remainingIds = allChampionshipFechaIds(events);
+  const sailors = state.sailors.map((sailor) => ({
+    ...sailor,
+    fechas: remainingIds,
+    updatedAt: at
+  }));
+  const fecha = state.fecha === id ? upcomingFechaId(events) : state.fecha;
   return {
     ...state,
     events,

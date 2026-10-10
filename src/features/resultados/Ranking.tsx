@@ -22,7 +22,9 @@ export function Ranking() {
 
   return (
     <ResultadosView
-      title="RANKING GENERAL"
+      title="Clasificación Final"
+      titleLine1="Clasificación"
+      titleLine2="Final"
       classLabel={filter}
       year={String(new Date().getFullYear())}
       stamp={new Date().toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}
@@ -31,12 +33,13 @@ export function Ranking() {
       classNames={classNames(api.state)}
       classFilter={filter}
       onClassFilter={api.setClassFilter}
-      pdfFilename="Ranking_General_CNA.pdf"
+      legendScope="final"
+      pdfFilename="Clasificacion_Final_CNA.pdf"
       note={
-        <p className="text-slate-500">
+        <p>
           {resultFechas.length
-            ? "Suma de puntos netos por fecha con resultados cargados (menor puntaje gana). Cada fecha usa solo las regatas publicadas en placa y los descartes definidos en Fechas. Las columnas vacías no suman."
-            : "Todavía no hay fechas con resultados cargados. El ranking se publicará cuando la comisión empiece la carga."}
+            ? "Menor total gana. Cada columna es el neto de esa fecha. Quienes se inscriben después reciben DNC en fechas ya corridas; las fechas futuras sin carga muestran 0 hasta publicarse."
+            : "Todavía no hay fechas con resultados cargados. La clasificación final se publicará cuando la comisión empiece la carga."}
         </p>
       }
     />

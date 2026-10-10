@@ -1,9 +1,11 @@
 import {
   defaultDiscardsAllowed,
   filteredSailors,
+  isFechaRegistrationClosed,
   sameBoatClass,
   sailorFechas,
-  sailorsInFecha
+  sailorsInFecha,
+  todayLocalIso
 } from "./model";
 import { clampRacesCount } from "./race-slots";
 import { canonicalScoreCell, normalizeScoreEntry } from "./score-entry";
@@ -59,9 +61,9 @@ export function formatRaceDiscardSummary(event: Fecha) {
     discards === 0 ? "sin descarte" : discards === 1 ? "1 descarte" : `${discards} descartes`;
   if (!raced) {
     const planned = columns === 1 ? "1 regata prevista" : `${columns} regatas previstas`;
-    return { raced: 0, columns, discards, line: `${planned} · ${discardLabel} · sin placa todavía` };
+    return { raced: 0, columns, discards, line: `${planned} · ${discardLabel} · sin clasificación todavía` };
   }
-  const racesLabel = raced === 1 ? "1 regata en placa" : `${raced} regatas en placa`;
+  const racesLabel = raced === 1 ? "1 regata publicada" : `${raced} regatas publicadas`;
   const plannedNote = columns > raced ? ` · ${columns} previstas` : "";
   return { raced, columns, discards, line: `${racesLabel}${plannedNote} · ${discardLabel}` };
 }
@@ -81,8 +83,18 @@ export function placaCellText(sailor: RankedSailor, raceIndex: number) {
   return formatRaceCellDisplay(sailor.raw[raceIndex], raceIndex, sailor.discardedRaceIndexes);
 }
 
-export function fechasWithResults(state: ChampionshipState) {
-  return state.events.filter(fechaResultsStarted);
+/** Regatas que entran al neto: publicadas o, si el día ya pasó, todas las previstas (DNC). */
+function raceIndexesForScoring(event: Fecha, todayIso: string) {
+  if (fechaResultsStarted(event)) return raceIndexesWithResults(event);
+  if (event.date?.trim() && isFechaRegistrationClosed(event, todayIso)) {
+    const count = clampRacesCount(event.racesCount);
+    return Array.from({ length: count }, (_, index) => index);
+  }
+  return [];
+}
+
+export function fechasWithResults(state: ChampionshipState, todayIso = todayLocalIso()) {
+  return state.events.filter((event) => raceIndexesForScoring(event, todayIso).length > 0);
 }
 
 const emptyDateNet = (): DateNet => ({
@@ -187,14 +199,20 @@ function compareOverall(netA: number, breakdownA: number[], netB: number, breakd
   return 0;
 }
 
-export function dateNet(state: ChampionshipState, sailor: Sailor, fechaKey: string): DateNet {
+export function dateNet(
+  state: ChampionshipState,
+  sailor: Sailor,
+  fechaKey: string,
+  todayIso = todayLocalIso()
+): DateNet {
   const event = state.events.find((item) => item.id === fechaKey);
   if (!event) return emptyDateNet();
-  if (!fechaResultsStarted(event)) return emptyDateNet();
   const entered = sailorFechas(sailor, state.events).includes(fechaKey);
   if (!entered) return emptyDateNet();
 
-  const activeIndexes = raceIndexesWithResults(event);
+  const activeIndexes = raceIndexesForScoring(event, todayIso);
+  if (!activeIndexes.length) return emptyDateNet();
+
   const raw = event.scores[sailor.id] || [];
   const fleet = fleetSize(state, sailor.boatClass, fechaKey);
   const racePts = activeIndexes.map((index) => {

@@ -33,20 +33,23 @@ export function Placa() {
 
   return (
     <ResultadosView
-      title={event ? `PLACA ${event.name.toUpperCase()}` : "SIN FECHAS"}
+      title={event ? `Clasificación Fecha · ${event.name}` : "Sin fechas"}
+      titleLine1="Clasificación"
+      titleLine2={event ? `Fecha · ${event.name}` : "Fecha"}
       classLabel={classLabel}
       year={String(new Date().getFullYear())}
       stamp={new Date().toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}
       columns={started && event ? placaColumns(event) : []}
+      legendScope="fecha"
       note={
         event && !started ? (
-          <p className="text-slate-500">
-            Todavía no hay resultados para esta fecha. Aparecerán cuando la comisión empiece la carga en la pestaña Carga.
+          <p>
+            Todavía no hay resultados para esta fecha. Aparecerán cuando la comisión empiece la carga en la pestaña
+            Carga.
           </p>
         ) : event ? (
-          <p className="text-slate-500">
-            {formatRaceDiscardSummary(event).line}. Low Point: menor puntaje gana. Las columnas vacías de carga no
-            aparecen.
+          <p>
+            {formatRaceDiscardSummary(event).line}. Solo se listan regatas con al menos un resultado cargado.
           </p>
         ) : undefined
       }
@@ -54,7 +57,7 @@ export function Placa() {
       classNames={classNames(api.state)}
       classFilter={filter}
       onClassFilter={api.setClassFilter}
-      pdfFilename={`Placa_${(event?.name || "fecha").replace(/\s+/g, "_")}_CNA.pdf`}
+      pdfFilename={`Clasificacion_Fecha_${(event?.name || "fecha").replace(/\s+/g, "_")}_CNA.pdf`}
     />
   );
 }

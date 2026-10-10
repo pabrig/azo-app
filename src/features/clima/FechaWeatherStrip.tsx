@@ -69,18 +69,17 @@ export function FechaWeatherStrip({
   }
   if (error) {
     return (
-      <div className="fecha-weather-panel">
-        <p className="text-center text-[10px] text-slate-400 leading-snug px-2">
-          {error}
-          {onRetry ? (
-            <>
-              {" "}
-              <button type="button" onClick={onRetry} className="text-cyan-400 underline underline-offset-2">
-                Reintentar
-              </button>
-            </>
-          ) : null}
-        </p>
+      <div className="fecha-weather-panel space-y-1.5">
+        <p className="text-center text-[10px] text-slate-400 leading-snug px-2">{error}</p>
+        {onRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mx-auto block text-[10px] font-semibold text-cyan-400 hover:text-cyan-300"
+          >
+            Reintentar
+          </button>
+        ) : null}
       </div>
     );
   }

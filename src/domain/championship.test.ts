@@ -2,7 +2,17 @@ import { describe, expect, it } from "vitest";
 import { cloudPayload, cloudView, hasCloudChampionship, mergeClassesMeta, mergeRemote, syncFingerprint } from "./cloud";
 import { sameBoatClass } from "./class-names";
 import { canonicalBoatClassName, migrateChampionshipState } from "./migrate-championship";
-import { defaultState, isFechaRegistrationClosed, makeFecha, migrateClasses, migrateEvents } from "./model";
+import {
+  defaultState,
+  isFechaRegistrationClosed,
+  makeFecha,
+  migrateClasses,
+  migrateEvents,
+  normalizeLoadedState,
+  resolveActiveFecha,
+  sailorsInFecha,
+  upcomingFechaId
+} from "./model";
 import { cargaRacesCount } from "./race-slots";
 import { normalizeScoreEntry } from "./score-entry";
 import {
@@ -894,7 +904,7 @@ describe("fechas y clases heredadas", () => {
       discardsAllowed: 1,
       scores
     };
-    expect(formatRaceDiscardSummary(state.events[0]).line).toBe("3 regatas en placa · 6 previstas · 1 descarte");
+    expect(formatRaceDiscardSummary(state.events[0]).line).toBe("3 regatas publicadas · 6 previstas · 1 descarte");
     expect(placaColumns(state.events[0])).toEqual(["R1", "R2", "R3"]);
     expect(dateNet(state, state.sailors[0], fechaId).net).toBe(3);
 
@@ -1050,15 +1060,22 @@ describe("inscripciones de varios dispositivos", () => {
     expect(mergeRemote(merged, cloudRow(merged)).sailors.map((item) => item.name)).toEqual(["Ana"]);
   });
 
-  it("junta las fechas de la misma persona anotada en dos celulares", () => {
+  it("junta la misma persona anotada en dos celulares y alinea fechas al calendario", () => {
     const local = defaultState();
     local.sailors = [sailor({ id: "local", sailNumber: "7", name: "Ana", fechas: ["f1"], updatedAt: 10 })];
-    const remote = defaultState();
-    remote.sailors = [sailor({ id: "remote", sailNumber: "7", name: "ana ", fechas: ["f2"], updatedAt: 20 })];
+    const remote = saveFecha(defaultState(), {
+      id: "",
+      name: "Fecha 2",
+      date: "2026-11-02",
+      time: "12:00",
+      avisos: ""
+    }).state!;
+    const f2 = remote.events.find((event) => event.name === "Fecha 2")!.id;
+    remote.sailors = [sailor({ id: "remote", sailNumber: "7", name: "ana ", fechas: [f2], updatedAt: 20 })];
     const merged = mergeRemote(local, cloudRow(remote));
     expect(merged.sailors).toHaveLength(1);
     expect(merged.sailors[0].id).toBe("remote");
-    expect(merged.sailors[0].fechas).toEqual(["f1", "f2"]);
+    expect(merged.sailors[0].fechas).toEqual(["f1", f2]);
   });
 
   it("el mismo nombre y apellido es la misma persona aunque cambie vela, clase o club", () => {
@@ -1191,10 +1208,169 @@ describe("inscripciones de varios dispositivos", () => {
 });
 
 describe("inscripción competidor", () => {
+  it("upcomingFechaId elige la primera fecha no cerrada (hoy incluido)", () => {
+    const events = [
+      makeFecha({ id: "f1", name: "Fecha 1", date: "2026-06-01" }),
+      makeFecha({ id: "f2", name: "Fecha 2", date: "2026-06-20" }),
+      makeFecha({ id: "f3", name: "Fecha 3", date: "2026-07-01" })
+    ];
+    expect(upcomingFechaId(events, "2026-06-15")).toBe("f2");
+    expect(upcomingFechaId(events, "2026-06-20")).toBe("f2");
+    expect(upcomingFechaId(events, "2026-08-01")).toBe("f3");
+    const loaded = normalizeLoadedState({
+      fecha: "f1",
+      events,
+      sailors: [],
+      classFilter: "ALL",
+      whatsappUrl: "",
+      classes: [],
+      removedSailors: [],
+      removedFechas: [],
+      whatsappAt: 0,
+      classesAt: 0
+    });
+    expect(resolveActiveFecha(loaded, "2026-06-15")).toBe("f2");
+  });
+
+  it("tras inscribirse muestra la próxima fecha aunque el formulario use otra de referencia", () => {
+    let state = defaultState();
+    state.events[0].date = "2020-01-01";
+    state = saveFecha(state, {
+      id: "",
+      name: "Fecha 2",
+      date: "2030-06-01",
+      time: "12:00",
+      avisos: ""
+    }).state!;
+    const f1 = state.events[0].id;
+    const f2 = state.events.find((event) => event.name === "Fecha 2")!.id;
+    state = registerSailor(state, {
+      sailNumber: "ARG 1",
+      boatClass: "ILCA 6",
+      name: "Ana",
+      category: "General",
+      club: "CNA",
+      fecha: f1
+    }).state;
+    expect(state.fecha).toBe(f2);
+  });
+
   it("fecha pasada cierra inscripción; mismo día o futuro no", () => {
     expect(isFechaRegistrationClosed(makeFecha({ date: "2020-06-01" }), "2025-06-02")).toBe(true);
     expect(isFechaRegistrationClosed(makeFecha({ date: "2025-06-02" }), "2025-06-02")).toBe(false);
     expect(isFechaRegistrationClosed(makeFecha({ date: "2025-06-03" }), "2025-06-02")).toBe(false);
     expect(isFechaRegistrationClosed(makeFecha({ date: "" }), "2025-06-02")).toBe(false);
+  });
+
+  it("al crear una fecha nueva todos los competidores aparecen inscriptos en la UI de esa fecha", () => {
+    let state = defaultState();
+    state = registerSailor(state, {
+      sailNumber: "ARG 1",
+      boatClass: "ILCA 6",
+      name: "Ana",
+      category: "General",
+      club: "CNA",
+      fecha: state.events[0].id
+    }).state;
+    state = {
+      ...state,
+      sailors: [{ ...state.sailors[0], fechas: [state.events[0].id] }]
+    };
+    state = saveFecha(state, {
+      id: "",
+      name: "Fecha 2",
+      date: "2026-12-01",
+      time: "12:00",
+      avisos: ""
+    }).state!;
+    const f2 = state.events.find((event) => event.name === "Fecha 2")!.id;
+    expect(sailorsInFecha(state, f2).map((item) => item.name)).toEqual(["Ana"]);
+    expect(state.sailors[0].fechas).toEqual(state.events.map((event) => event.id));
+  });
+
+  it("al inscribirse queda anotado en todas las fechas del campeonato", () => {
+    let state = defaultState();
+    const f1 = state.events[0].id;
+    state = saveFecha(state, {
+      id: "",
+      name: "Fecha 2",
+      date: "2026-12-01",
+      time: "12:00",
+      avisos: ""
+    }).state!;
+    const f2 = state.events.find((event) => event.name === "Fecha 2")!.id;
+    state = registerSailor(state, {
+      sailNumber: "ARG 1",
+      boatClass: "ILCA 6",
+      name: "Ana",
+      category: "General",
+      club: "CNA",
+      fecha: f2
+    }).state;
+    expect(state.sailors[0].fechas).toEqual([f1, f2]);
+  });
+
+  it("inscripción tardía suma DNC en fechas pasadas con resultados ya cargados", () => {
+    let state = defaultState();
+    const f1 = state.events[0].id;
+    state.events[0].date = "2020-06-01";
+    state.events[0].racesCount = 1;
+    state = saveFecha(state, {
+      id: "",
+      name: "Fecha 2",
+      date: "2030-01-01",
+      time: "12:00",
+      avisos: ""
+    }).state!;
+    const f2 = state.events.find((event) => event.name === "Fecha 2")!.id;
+    state = {
+      ...state,
+      sailors: [
+        {
+          id: "a",
+          sailNumber: "1",
+          boatClass: "ILCA 6",
+          name: "Ana",
+          category: "General",
+          club: "CNA",
+          fechas: [f1, f2]
+        }
+      ]
+    };
+    state.events.find((event) => event.id === f1)!.scores = { a: ["1"] };
+    state = registerSailor(state, {
+      sailNumber: "2",
+      boatClass: "ILCA 6",
+      name: "Beto",
+      category: "General",
+      club: "CNA",
+      fecha: f2
+    }).state;
+    const beto = state.sailors.find((item) => item.name === "Beto")!;
+    expect(beto.fechas).toEqual([f1, f2]);
+    const today = "2025-06-02";
+    expect(dateNet(state, beto, f1, today).net).toBe(3);
+    expect(dateNet(state, beto, f2, today).net).toBe(0);
+    const overall = rankedOverall({ ...state, classFilter: "ILCA 6" });
+    expect(overall.find((item) => item.id === beto.id)?.breakdown).toEqual([3]);
+  });
+
+  it("fecha pasada sin carga publicada aplica DNC sobre regatas previstas en clasificación final", () => {
+    let state = defaultState();
+    const f1 = state.events[0].id;
+    state.events[0].date = "2020-06-01";
+    state.events[0].racesCount = 2;
+    state.events[0].discardsAllowed = 0;
+    state = registerSailor(state, {
+      sailNumber: "ARG 1",
+      boatClass: "ILCA 6",
+      name: "Ana",
+      category: "General",
+      club: "CNA",
+      fecha: f1
+    }).state;
+    const today = "2025-06-02";
+    expect(fechaResultsStarted(state.events[0])).toBe(false);
+    expect(dateNet(state, state.sailors[0], f1, today).net).toBe(4);
   });
 });

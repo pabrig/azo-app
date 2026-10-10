@@ -38,6 +38,25 @@ export function isFechaRegistrationClosed(fecha: Fecha, todayIso = todayLocalIso
   return day < todayIso;
 }
 
+function sortEventsBySchedule(events: Fecha[]) {
+  return [...events].sort(
+    (a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`) || a.id.localeCompare(b.id)
+  );
+}
+
+/** Próxima fecha del calendario (hoy incluido). Si todas pasaron, la más reciente. */
+export function upcomingFechaId(events: Fecha[], todayIso = todayLocalIso()) {
+  const sorted = sortEventsBySchedule(events);
+  if (!sorted.length) return "";
+  const nextOpen = sorted.find((event) => !isFechaRegistrationClosed(event, todayIso));
+  return nextOpen?.id || sorted[sorted.length - 1].id;
+}
+
+/** Al abrir la app: foco en la próxima fecha (el timonel puede cambiarla en la sesión). */
+export function resolveActiveFecha(state: ChampionshipState, todayIso = todayLocalIso()) {
+  return upcomingFechaId(state.events, todayIso);
+}
+
 /** Descarte por defecto del campeonato (3+ regatas → 1, como placa oficial). */
 export function defaultDiscardsAllowed(racesCount: number) {
   return racesCount >= 3 ? 1 : 0;
@@ -132,7 +151,7 @@ function DEFAULT_BOAT_CLASSES_LOOKUP(name: string) {
 export function defaultState(): ChampionshipState {
   const events = seedEvents();
   return {
-    fecha: events[0].id,
+    fecha: upcomingFechaId(events),
     classFilter: "ALL",
     sailors: [],
     events,
@@ -343,9 +362,33 @@ export function fechaLabel(events: Fecha[], id: string) {
   return event.date ? `${event.name} (${formatDay(event.date)})` : event.name;
 }
 
-export function sailorFechas(sailor: Sailor, events: Fecha[]) {
-  if (Array.isArray(sailor.fechas) && sailor.fechas.length) return sailor.fechas;
-  return events[0] ? [events[0].id] : [];
+/** Todas las fechas del campeonato (orden del calendario). */
+export function allChampionshipFechaIds(events: Fecha[]) {
+  return events.map((event) => event.id);
+}
+
+/** Inscripción al campeonato completo: todo competidor participa en cada fecha del calendario. */
+export function sailorFechas(_sailor: Sailor, events: Fecha[]) {
+  return allChampionshipFechaIds(events);
+}
+
+function sailorFechasStored(sailor: Sailor) {
+  return Array.isArray(sailor.fechas) ? sailor.fechas : [];
+}
+
+/** Persiste en cada timonel la lista completa de fechas (sync y listados). */
+export function alignSailorsToChampionshipFechas(state: ChampionshipState): ChampionshipState {
+  const allIds = allChampionshipFechaIds(state.events);
+  if (!allIds.length || !state.sailors.length) return state;
+  let changed = false;
+  const sailors = state.sailors.map((sailor) => {
+    const stored = sailorFechasStored(sailor);
+    const complete = stored.length === allIds.length && allIds.every((id) => stored.includes(id));
+    if (complete) return sailor;
+    changed = true;
+    return { ...sailor, fechas: allIds };
+  });
+  return changed ? { ...state, sailors } : state;
 }
 
 export function sailorsInFecha(state: ChampionshipState, fechaKey: string) {
@@ -385,13 +428,12 @@ export function normalizeLoadedState(parsed: Partial<ChampionshipState> | null |
   if (!parsed) return defaultState();
   const removedFechas = Array.isArray(parsed.removedFechas) ? parsed.removedFechas : [];
   const events = compactDuplicateFechas(applyRemovedFechas(migrateEvents(parsed.events), removedFechas));
-  const fecha = events.some((event) => event.id === parsed.fecha) ? parsed.fecha || "" : events[0]?.id || "";
-  return applyCanonicalClassNames({
+  const draft = applyCanonicalClassNames({
     ...defaultState(),
     ...parsed,
     sailors: Array.isArray(parsed.sailors) ? parsed.sailors : [],
     events,
-    fecha,
+    fecha: events.some((event) => event.id === parsed.fecha) ? parsed.fecha || "" : upcomingFechaId(events),
     classFilter: typeof parsed.classFilter === "string" ? parsed.classFilter : "ALL",
     whatsappUrl: parsed.whatsappUrl || DEFAULT_WHATSAPP,
     classes: migrateClasses(parsed.classes),
@@ -400,4 +442,5 @@ export function normalizeLoadedState(parsed: Partial<ChampionshipState> | null |
     whatsappAt: typeof parsed.whatsappAt === "number" ? parsed.whatsappAt : 0,
     classesAt: typeof parsed.classesAt === "number" ? parsed.classesAt : 0
   });
+  return { ...draft, fecha: resolveActiveFecha(draft) };
 }

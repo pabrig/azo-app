@@ -24,8 +24,23 @@ function NavTabButton({
       <span className="nav-tab-icon">
         <TabNavIcon tab={item.id} size={variant === "top" ? 18 : 20} />
       </span>
-      <span className="nav-tab-label nav-tab-label--full">{item.label}</span>
-      <span className="nav-tab-label nav-tab-label--short">{item.shortLabel}</span>
+      {variant === "bottom" && item.mobileLines ? (
+        <span className="nav-tab-label nav-tab-label--stacked">
+          <span>{item.mobileLines[0]}</span>
+          <span>{item.mobileLines[1]}</span>
+        </span>
+      ) : (
+        <span className={`nav-tab-label ${item.mobileLines ? "nav-tab-label--stacked nav-tab-label--stacked-top" : ""}`}>
+          {item.mobileLines ? (
+            <>
+              <span>{item.mobileLines[0]}</span>
+              <span>{item.mobileLines[1]}</span>
+            </>
+          ) : (
+            item.label
+          )}
+        </span>
+      )}
     </button>
   );
 }
